@@ -64,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_model_to_folder",
         type=str,
-        default="./trained_model_3/",
+        default="./trained_model/",
         help="Folder to save the model",
     )
     parser.add_argument(
