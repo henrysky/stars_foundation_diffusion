@@ -767,48 +767,41 @@ class StellarPerceptron:
 
     def predict_posterior(
         self,
-        inputs: Union[List[float], NDArray],
-        inputs_token: List[Union[int, str]],
-        request_tokens: List[Union[int, str]],
+        *,
+        inputs: Union[List[float], NDArray] = None,
+        input_tokens: List[Union[int, str]] = None,
+        request_tokens: List[Union[int, str]] = None,
         size: int = 10000,
         batch_size: int = 128,
     ):
         """
-        This function to generate posterior samples from the model.
+        This function to generate posterior samples from the model
 
-        Parameters
-        ----------
-        inputs : array-like
-            The input data to be perceived. The shape of the input data should be (n_samples, n_features).
-            If it is pandas DataFrame, the column names should be vacobs understood by the model.
-        inputs_token: list
-            Tokens or names of input data.
-        request_tokens: str
-            Tokens or names of requested data.
-        size: int
-            Number of samples to generate posterior
-        batch_size: int
-            Batch size for prediction
-
-        Returns
-        -------
-        Posteriors : np.ndarray
-            The size of the array will be (size, n_samples, n_requested_data)
-
-        Examples
-        --------
-        >>> nn_model.predict_posterior([4700, 2.5], ["teff", "logg"], ["teff"])
-        """
+        Args:
+            inputs (Union[List[float], NDArray]): The input data to be perceived. The shape of the input data should be (n_samples, n_features).
+                If it is pandas DataFrame, the column names should be vacobs understood by the model.
+            input_tokens (List[Union[int, str]]): Tokens or names of input data.
+            request_tokens (List[Union[int, str]]): Tokens or names of requested data.
+            size (int, optional): Number of samples to generate posterior. Defaults to 10000.
+            batch_size (int, optional): Batch size for prediction. Defaults to 128.
+        
+        Returns:
+            np.ndarray: The size of the array will be (size, n_samples, n_requested_data)
+        
+        Examples:
+            >>> nn_model.predict_posterior([4700, 2.5], ["teff", "logg"], ["teff"])
+        """        
         self._built_only()
         self.torch_model.eval()
-
         if isinstance(request_tokens, list) and len(request_tokens) > 1:
             raise ValueError(
                 "Only one requested token is allowed so far limited by implementation"
             )
-
+        if inputs is None:
+            inputs = [-9999.99]
+            input_tokens = [0]
         inputs = np.atleast_2d(inputs)
-        inputs_token = np.atleast_2d(inputs_token)
+        input_tokens = np.atleast_2d(input_tokens)
         request_tokens = np.atleast_2d(request_tokens)
 
         # deal with length of data
@@ -816,16 +809,16 @@ class StellarPerceptron:
         num_batch = data_len // batch_size
         num_batch_remainder = data_len % batch_size
 
-        inputs_token = self.tokenize(inputs_token, data_length=len(inputs))
-        inputs, inputs_token = self.standardize(inputs, inputs_token)
-        self._last_padding_mask = inputs_token == 0
+        input_tokens = self.tokenize(input_tokens, data_length=len(inputs))
+        inputs, input_tokens = self.standardize(inputs, input_tokens)
+        self._last_padding_mask = input_tokens == 0
 
         if request_tokens.dtype.type == np.str_:
             request_tokens = self.tokenize(request_tokens, data_length=len(inputs))
 
         # ndarray to torch tensor
-        inputs_token = torch.as_tensor(
-            inputs_token, device=self.factory_kwargs["device"], dtype=torch.int32
+        input_tokens = torch.as_tensor(
+            input_tokens, device=self.factory_kwargs["device"], dtype=torch.int32
         )
         inputs = torch.atleast_3d(torch.as_tensor(inputs, **self.factory_kwargs))
         request_tokens = torch.as_tensor(
@@ -836,7 +829,7 @@ class StellarPerceptron:
 
         with torch.inference_mode():
             if num_batch == 0:  # if smaller than batch_size, then do all at once
-                x_cond = self.torch_model(inputs, inputs_token, request_tokens).repeat(
+                x_cond = self.torch_model(inputs, input_tokens, request_tokens).repeat(
                     size, 1
                 )
                 request_tokens = request_tokens.repeat(size, 1)
@@ -861,7 +854,7 @@ class StellarPerceptron:
                     ]
                     x_cond = self.torch_model(
                         inputs[i * batch_size : i * batch_size + batch_size],
-                        inputs_token[i * batch_size : i * batch_size + batch_size],
+                        input_tokens[i * batch_size : i * batch_size + batch_size],
                         request_tokens_batch,
                     ).repeat(size, 1)
                     request_tokens_batch = request_tokens_batch.repeat(size, 1)
@@ -883,7 +876,7 @@ class StellarPerceptron:
                     # do the remainder
                     x_cond = self.torch_model(
                         inputs[num_batch * batch_size :],
-                        inputs_token[num_batch * batch_size :],
+                        input_tokens[num_batch * batch_size :],
                         request_tokens_batch,
                     ).repeat(size, 1)
                     request_tokens_batch = request_tokens_batch.repeat(size, 1)
@@ -905,41 +898,36 @@ class StellarPerceptron:
 
     def predict_summary(
         self,
-        inputs: Union[List[float], NDArray],
-        inputs_token: List[Union[int, str]],
-        request_tokens: List[Union[int, str]],
+        *,
+        inputs: Union[List[float], NDArray] = None,
+        input_tokens: List[Union[int, str]] = None,
+        request_tokens: List[Union[int, str]] = None,
         batch_size=128,
         size: int = 10000,
     ):
         """
         This function to generate summary statistics of posterior samples from the model
 
-        Parameters
-        ----------
-        inputs : array-like
-            The input data to be perceived. The shape of the input data should be (n_samples, n_features).
-            If it is pandas DataFrame, the column names should be vacobs understood by the model.
-        inputs_token: list
-            Tokens or names of input data.
-        request_tokens: list
-            Tokens or names of requested data.
-        batch_size: int
-            Batch size for prediction
-        size: int
-            Number of samples to generate posterior
-
-        Returns
-        -------
-        Posteriors : array-like
-            The size of the array will be (n_samples, 2 * n_requested_data), where the first half is the median and the second half is the MAD standard deviation
-
-        Examples
-        --------
-        >>> nn_model.predict_summary([4700, 2.5], ["teff", "logg"], "teff")
-        """
+        Args:
+            inputs (Union[List[float], NDArray]): The input data to be perceived. The shape of the input data should be (n_samples, n_features).
+                If it is pandas DataFrame, the column names should be vacobs understood by the model.
+            input_tokens (List[Union[int, str]]): Tokens or names of input data.
+            request_tokens (List[Union[int, str]]): Tokens or names of requested data.
+            batch_size (int, optional): Batch size for prediction. Defaults to 128.
+            size (int, optional): Number of samples to generate posterior. Defaults to 10000.
+        
+        Returns:
+            pd.DataFrame: The size of the array will be (n_samples, 2 * n_requested_data), where the first half is the median and the second half is the MAD standard deviation
+        
+        Examples:
+            >>> nn_model.predict_summary([4700, 2.5], ["teff", "logg"], "teff")
+        """        
+        if inputs is None:
+            inputs = [-9999.99]
+            input_tokens = [0]
         inputs = np.atleast_2d(inputs)
-        inputs_token = np.atleast_2d(inputs_token)
-        inputs_token = self.tokenize(inputs_token, data_length=len(inputs))
+        input_tokens = np.atleast_2d(input_tokens)
+        input_tokens = self.tokenize(input_tokens, data_length=len(inputs))
         request_tokens = np.atleast_2d(request_tokens)
         request_tokens_num = request_tokens.shape[1]
 
@@ -954,7 +942,10 @@ class StellarPerceptron:
         if num_batch == 0:  # if smaller than batch_size, then do all at once
             for request_idx in range(request_tokens_num):
                 posterior = self.predict_posterior(
-                    inputs, inputs_token, request_tokens[:, request_idx], size=size
+                    inputs=inputs, 
+                    input_tokens=input_tokens, 
+                    request_tokens=request_tokens[:, request_idx], 
+                    size=size
                 )
                 median_ls[:, request_idx] = np.median(posterior, axis=0)
                 mad_std_ls[:, request_idx] = mad_std(posterior, axis=0)
@@ -966,9 +957,9 @@ class StellarPerceptron:
                         enabled=self.mixed_precision,
                     ):
                         posterior = self.predict_posterior(
-                            inputs[i * batch_size : i * batch_size + batch_size],
-                            inputs_token[i * batch_size : i * batch_size + batch_size],
-                            request_tokens[:, request_idx],
+                            inputs=inputs[i * batch_size : i * batch_size + batch_size],
+                            input_tokens=input_tokens[i * batch_size : i * batch_size + batch_size],
+                            request_tokens=request_tokens[:, request_idx],
                             size=size,
                         )
                         median_ls[
@@ -981,9 +972,9 @@ class StellarPerceptron:
                 # do the remainder
                 for request_idx in range(request_tokens_num):
                     posterior = self.predict_posterior(
-                        inputs[num_batch * batch_size :],
-                        inputs_token[num_batch * batch_size :],
-                        request_tokens[:, request_idx],
+                        inputs=inputs[num_batch * batch_size :],
+                        input_tokens=input_tokens[num_batch * batch_size :],
+                        request_tokens=request_tokens[:, request_idx],
                         size=size,
                     )
                     median_ls[num_batch * batch_size :, request_idx] = np.median(
