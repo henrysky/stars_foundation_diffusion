@@ -198,13 +198,12 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
         input_token_tensor: torch.Tensor,
         y_token_tensor: torch.Tensor,
         y_tensor: torch.Tensor,
-        y_err_tensor: torch.Tensor,
     ) -> torch.Tensor:
         out = self(input_tensor, input_token_tensor, y_token_tensor)
 
         # diffusion loss
         diffusion_loss = self.diffusion_head.noise_estimation_loss(
-            y_tensor, out, y_err_tensor
+            y_tensor, out
         )
 
         return diffusion_loss

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial import cKDTree as KDTree
 
 
 def KLdivergence(x, y):
@@ -24,8 +25,6 @@ def KLdivergence(x, y):
     Pérez-Cruz, F. Kullback-Leibler divergence estimation of continuous distributions 
     IEEE International Symposium on Information Theory, 2008.
     """
-    from scipy.spatial import cKDTree as KDTree
-
     # Check the dimensions are consistent
     x = np.atleast_2d(x)
     y = np.atleast_2d(y)

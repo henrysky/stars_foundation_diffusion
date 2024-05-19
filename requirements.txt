@@ -1,0 +1,19 @@
+numpy
+astropy
+astroquery
+tqdm
+scikit-learn
+torch > 2.2.0
+matplotlib
+packaging
+pandas
+h5py
+beautifulsoup4
+requests
+sympy
+pyyaml
+jinja2
+pytest
+GaiaXPy
+gaiadr3_zeropoint
+MyGaiaDB
