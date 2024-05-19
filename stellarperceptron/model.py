@@ -6,7 +6,7 @@ import pathlib
 import subprocess
 import warnings
 from datetime import timedelta
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -31,9 +31,6 @@ class StellarPerceptron:
         vocab_tokens: List[int] = None,
         embedding_dim: int = 32,
         embedding_activation=None,
-        # embedding_config: dict = None,
-        # encoder_config: dict = None,
-        # diffusion_config: dict = None,
         encoder_head_num: int = 2,
         encoder_dense_num: int = 128,
         encoder_dropout_rate: float = 0.1,
@@ -399,15 +396,12 @@ class StellarPerceptron:
             "norm_config": norm_config,
         }
 
-    def save(self, folder_name: str = "model", checkpoint: bool = False) -> None:
+    def save(self, folder_name: str = "model") -> None:
         """
         Backend framework independent save
         """
         pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
-        if checkpoint:
-            file_name = f"{folder_name}/checkpoints/epoch_{self.current_epoch}.pt"
-        else:
-            file_name = f"{folder_name}/weights.pt"
+        file_name = f"{folder_name}/checkpoints/epoch_{self.current_epoch}.pt"
         file_name = pathlib.Path(file_name).resolve()
         if not file_name.exists():
             torch.save(
@@ -444,7 +438,7 @@ class StellarPerceptron:
         folder_name : str
             folder name of the model
         checkpoint_epoch : int
-            checkpoint epoch to load, -1 for the final model
+            checkpoint epoch to load, -1 for the last model
         mixed_precision : bool
             whether to use mixed precision
         compile_model : bool
@@ -452,13 +446,18 @@ class StellarPerceptron:
         device : str
             device to load the model to
         """
-        path_to_weights = pathlib.Path(f"{folder_name}/weights.pt").resolve()
         if checkpoint_epoch != -1:
             path_to_weights = pathlib.Path(f"{folder_name}/checkpoints/epoch_{checkpoint_epoch}.pt").resolve()
             if not path_to_weights.exists():
                 raise FileNotFoundError(
                     f"Checkpoint at epoch {checkpoint_epoch} not found at {path_to_weights}!"
                 )
+        elif checkpoint_epoch == -1:
+            # get the last checkpoint
+            checkpoints = list(pathlib.Path(f"{folder_name}/checkpoints").glob("*.pt"))
+            if len(checkpoints) == 0:
+                raise FileNotFoundError("No checkpoint found!")
+            path_to_weights = sorted(checkpoints)[-1]
         elif checkpoint_epoch < -1:
             raise ValueError("checkpoint_epoch must be >= 0")
         if not os.path.exists(folder_name):
@@ -536,6 +535,7 @@ class StellarPerceptron:
         inputs_err: Optional[NDArray] = None,
         outputs: Optional[NDArray] = None,
         batch_size: int = 64,
+        length_range: Tuple[int, int] = (0, 64),
         # batch size to use for validation compared to training batch size
         val_batchsize_factor: int = 5,
         epochs: int = 32,
@@ -554,10 +554,11 @@ class StellarPerceptron:
         # check checkpoint_every_n_epochs
         if checkpoint_every_n_epochs < 0:
             raise ValueError("checkpoint_every_n_epochs can not be less than zero")
-        else:
-            pathlib.Path(f"{self.root_folder}/checkpoints").mkdir(
-                parents=True, exist_ok=True
-            )
+        elif checkpoint_every_n_epochs == 0:
+            checkpoint_every_n_epochs = epochs
+        pathlib.Path(f"{self.root_folder}/checkpoints").mkdir(
+            parents=True, exist_ok=True
+        )
 
         training_log_path = f"{self.root_folder}/training.log"
         # check if the exists
@@ -620,7 +621,8 @@ class StellarPerceptron:
                 "output": X_train,
                 "output_err": X_Err_train,
             },
-            length_range=(0, 64),
+            aggregate_nans=False,
+            length_range=length_range,
             possible_output_tokens=outputs_tokens,
             factory_kwargs=self.factory_kwargs,
         )
@@ -633,7 +635,8 @@ class StellarPerceptron:
                 "output": X_val,
                 "output_err": X_Err_val,
             },
-            length_range=(0, 64),
+            aggregate_nans=False,
+            length_range=length_range,
             possible_output_tokens=outputs_tokens,
             shuffle=False,  # no need to shuffle for validation
             factory_kwargs=self.factory_kwargs,
@@ -679,7 +682,6 @@ class StellarPerceptron:
                             input_token,
                             label_token,
                             label,
-                            label_err,
                         )
                     self.gradient_scaler.scale(loss).backward()
                     self.gradient_scaler.step(self.optimizer)
@@ -712,7 +714,6 @@ class StellarPerceptron:
                                 input_token,
                                 label_token,
                                 label,
-                                label_err,
                             )
                         running_vloss += vloss.item()
                         # running_vloss_mse += vloss_mse.item()
@@ -754,12 +755,10 @@ class StellarPerceptron:
                 if checkpoint_every_n_epochs > 0:
                     # always save the one right after first epoch
                     if self.current_epoch % checkpoint_every_n_epochs == 0 or self.current_epoch == 1:
-                        self.save(folder_name=self.root_folder, checkpoint=True)
+                        self.save(folder_name=self.root_folder)
                         if terminate_on_checkpoint and self.current_epoch != 1:
                             warnings.warn("Training terminated due to checkpoint has been reached!")
                             break
-                if self.current_epoch == self.epochs:
-                    self.save(folder_name=self.root_folder, checkpoint=False)
             # ====================== Training logic ======================
 
         training_log_f.close()
@@ -835,8 +834,8 @@ class StellarPerceptron:
                 request_tokens = request_tokens.repeat(size, 1)
 
                 posterior = self.torch_model.diffusion_head.p_sample_loop(
-                    [data_len * size, 1],
-                    x_cond,
+                    size=data_len * size,
+                    cond=x_cond,
                     return_steps=False,
                 )
                 posterior = (
@@ -859,8 +858,8 @@ class StellarPerceptron:
                     ).repeat(size, 1)
                     request_tokens_batch = request_tokens_batch.repeat(size, 1)
                     _temp = self.torch_model.diffusion_head.p_sample_loop(
-                        [batch_size * size, 1],
-                        x_cond,
+                        batch_size * size,
+                        cond=x_cond,
                         return_steps=False,
                     )
                     posterior[:, i * batch_size : i * batch_size + batch_size] = (
@@ -882,8 +881,8 @@ class StellarPerceptron:
                     request_tokens_batch = request_tokens_batch.repeat(size, 1)
 
                     _temp = self.torch_model.diffusion_head.p_sample_loop(
-                        [num_batch_remainder * size, 1],
-                        x_cond,
+                        size=num_batch_remainder * size,
+                        cond=x_cond,
                         return_steps=False,
                     )
                     posterior[:, num_batch * batch_size :] = (

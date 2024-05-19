@@ -1,6 +1,7 @@
 """Denosing diffusion probabilistic model"""
 
 from typing import Callable, Optional, Tuple, Union
+import warnings
 
 import numpy as np
 import torch
@@ -23,7 +24,7 @@ class ConditionalLinear(nn.Module):
 
         Args:
             dim_in (int): input dimension
-            dim_out (int): output dimension
+            dim_out (int): output dimension, also the time embedding dimension
             t (int): total number of time step tokens
             cond_dim (int, optional): condition dimension, by default 0 (no condition)
             device (Union[str, torch.device], optional): device to run the model, by default "cpu"
@@ -33,15 +34,21 @@ class ConditionalLinear(nn.Module):
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.t = t
-        if cond_dim < 0:
+        self.cond_dim = cond_dim
+        self.factory_kwargs = {"device": device, "dtype": dtype}
+        if self.cond_dim < 0:
             raise ValueError("cond_dim must be non-negative")
         else:
-            if cond_dim != self.dim_out:
-                # since the condition is added to the time embedding, it must have the same dimension as the output
-                raise ValueError("cond_dim must be equal to the output dimension")
+            if self.cond_dim != self.dim_out and self.cond_dim != 0:
+                # since the condition is added to the time embedding, it must have the same dimension as the output so we are mapping it to the same dimension
+                warnings.warn("In ideal case, cond_dim equals to dim_out. Now cond_dim is linearly mapped to dim_out (i.e., additional trainable parameters).")
+                self.cond_lin = nn.Linear(
+                    self.cond_dim,
+                    self.dim_out,
+                    **self.factory_kwargs,
+                )
             else:
-                self.cond_dim = cond_dim
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+                self.cond_lin = torch.nn.Identity()
         self.lin = nn.Linear(
             self.dim_in,
             self.dim_out,
@@ -67,7 +74,7 @@ class ConditionalLinear(nn.Module):
             t (torch.Tensor): time token
             cond (torch.Tensor): condition tensor
         """
-        gamma = self.embed(t) + cond
+        gamma = self.embed(t) + self.cond_lin(cond)
         out = gamma.view(-1, self.dim_out) + x
         return out
 
@@ -259,7 +266,7 @@ class ConditionalDiffusionModel(nn.Module):
 
     def p_sample_loop(
         self,
-        shape: Tuple[int, ...],
+        size: int,
         cond: Optional[torch.Tensor] = None,
         return_steps: bool = False,
     ) -> torch.Tensor:
@@ -267,27 +274,27 @@ class ConditionalDiffusionModel(nn.Module):
         Perform the whole denoising step from pure noise to the final output
 
         Args:
-            shape (Tuple[int, ...]): shape of the input tensor
+            size int: size of samples to generate
             cond (torch.Tensor, optional): condition tensor, by default None
             return_steps (bool, optional): return intermediate steps, by default False
         """
-        cur_x = torch.randn(shape, **self.factory_kwargs)
-        x_seq = [cur_x]
-        for i in self.reversed_t_array:
+        cur_x = torch.randn(size, self.dim, **self.factory_kwargs)
+        if return_steps:
+            x_seq = torch.zeros((self.num_steps, size, self.dim), **self.factory_kwargs)
+        for idx, i in enumerate(self.reversed_t_array):
             cur_x = self.p_sample(
                 cur_x,
                 i,
                 cond,
             )
             if return_steps:
-                x_seq.append(cur_x)
-        return cur_x if not return_steps else torch.stack(x_seq)
+                x_seq[idx] = cur_x
+        return cur_x if not return_steps else x_seq
 
     def noise_estimation_loss(
         self,
         x_0: torch.Tensor,
         cond_x: Optional[torch.Tensor] = None,
-        x_0_err: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Noise estimation loss
@@ -295,7 +302,6 @@ class ConditionalDiffusionModel(nn.Module):
         Args:
             x_0 (torch.Tensor): input tensor
             cond_x (torch.Tensor, optional): condition tensor, by default None
-            x_0_err (torch.Tensor, optional): error tensor, by default None
         """
         batch_size = x_0.shape[0]
         # Select a random step for each example
@@ -314,8 +320,8 @@ class ConditionalDiffusionModel(nn.Module):
         # model input
         x = x_0 * a + e * am1
         output = self(x, t, cond_x)
-        # MSE between model prediction and the ground truth score
-        return torch.nn.functional.mse_loss(output, e)
+        loss = torch.nn.functional.mse_loss(output, e)
+        return loss
 
     def make_beta_schedule(self, schedule: str = "linear") -> torch.Tensor:
         if schedule == "linear":
