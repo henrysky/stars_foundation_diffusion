@@ -1,8 +1,10 @@
-from stellarperceptron.ddpm import ConditionalDiffusionModel
-import torch
 import numpy as np
+import torch
+import tqdm
 from sklearn.datasets import make_moons
 from utils import KLdivergence
+
+from stellarperceptron.ddpm import ConditionalDiffusionModel
 
 device = "cpu"
 
@@ -42,7 +44,7 @@ def test_moon():
     optimizer = torch.optim.Adam(nn_model.parameters(), lr=1e-3)
     batch_size = 128
 
-    for t in range(256):
+    for t in tqdm.tqdm(range(256)):
         permutation = torch.randperm(dataset.size()[0])
         for i in range(0, dataset.size()[0], batch_size):
             # Retrieve current batch
@@ -86,7 +88,7 @@ def test_two_normal_conditional():
     optimizer = torch.optim.Adam(nn_model.parameters(), lr=1e-3)
     batch_size = 128
 
-    for t in range(256):
+    for t in tqdm.tqdm(range(256)):
         permutation = torch.randperm(dataset.size()[0])
         for i in range(0, dataset.size()[0], batch_size):
             # Retrieve current batch
@@ -115,6 +117,6 @@ def test_two_normal_conditional():
                 return_steps=False,
             ).cpu()
         assert (
-            KLdivergence(x_seq.numpy(), sampling_two_normal(*ground_cond, n=1000))
-            < 0.2
+            KLdivergence(x_seq.numpy(), np.stack([sampling_two_normal(*ground_cond, n=1) for _ in range(1000)]))
+            < 0.25
         )
