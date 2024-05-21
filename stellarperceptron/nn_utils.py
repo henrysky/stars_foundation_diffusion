@@ -46,7 +46,7 @@ def shuffle_row(arrays_ls: List[NDArray], first_n: Optional[List[int]] = None) -
         )
     if not all([a.shape == array_shape for a in arrays_ls]):
         raise ValueError("All arrays should have the same shape")
-
+    
     master_idx = np.tile(np.arange(array_shape[1]), (array_shape[0], 1))
 
     if first_n is None:  # if yes then use a faster implementation
@@ -198,7 +198,7 @@ class TrainingGenerator(torch.utils.data.IterableDataset):
 
         self.epoch_input = copy.deepcopy(self.input)
         self.epoch_input_idx = copy.deepcopy(self.input_idx)
-        shuffle_row(
+        self.epoch_input, self.epoch_input_idx = shuffle_row(
             [self.epoch_input, self.epoch_input_idx], first_n=self.first_n_shuffle
         )
         # crop
@@ -224,9 +224,8 @@ class TrainingGenerator(torch.utils.data.IterableDataset):
             dtype=self.factory_kwargs["dtype"],
         ).to(self.factory_kwargs["device"], non_blocking=True)[self.idx_list]
         self.batches_lengthes = rng.integers(
-            low=self.length_range[0], high=self.length_range[1], size=len(self)
+            low=self.length_range[0], high=self.length_range[1]+1, size=len(self)
         )
-
 
 
 # class TrainingGenerator(torch.utils.data.IterableDataset):

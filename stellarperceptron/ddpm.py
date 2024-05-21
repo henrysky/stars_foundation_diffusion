@@ -219,7 +219,7 @@ class ConditionalDiffusionModel(nn.Module):
         if callable(activation):
             return activation
         else:
-            raise ValueError("Activation function must be callable")
+            raise ValueError("Activation function must be callable or string of PyTorch activation function")
 
     def _forward_simple(
         self, x: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor] = None

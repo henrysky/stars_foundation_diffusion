@@ -1,0 +1,84 @@
+{
+    "nn_config": {
+        "backend_framewoark": "torch-2.2.2",
+        "embedding_dim": 32,
+        "embedding_activation": "gelu",
+        "encoder_head_num": 4,
+        "encoder_dense_num": 128,
+        "encoder_dropout_rate": 0.1,
+        "encoder_activation": "gelu",
+        "encoder_n_layers": 2
+    },
+    "ddpm_config": {
+        "dim": 1,
+        "cond_dim": 32,
+        "num_steps": 100,
+        "dense_num": 64,
+        "activation": "gelu",
+        "beta_start": 1e-05,
+        "beta_end": 0.1,
+        "schedule": "sigmoid"
+    },
+    "tokenizer_config": {
+        "vocabs": [
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
+            "HouseValue"
+        ],
+        "vocab_tokens": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+        ]
+    },
+    "norm_config": {
+        "_input_mean": [
+            0.0,
+            3.5347999999999997,
+            29.0,
+            5.229128787878788,
+            1.048780487804878,
+            1166.0,
+            2.818115654360196,
+            34.26,
+            -118.49,
+            1.797
+        ],
+        "_input_std": [
+            1.0,
+            1.577785280933661,
+            14.82602218505602,
+            1.1904118703923396,
+            0.06832850181141759,
+            652.3449761424649,
+            0.621989566995101,
+            1.8236007287618858,
+            1.8977308396871724,
+            1.0140999174578318
+        ],
+        "_input_standardized": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+        ]
+    }
+}

@@ -410,7 +410,7 @@ class StellarPerceptron:
                     "optimizer_state_dict": self.optimizer.state_dict(),
                     "optimizer": self.optimizer.__class__.__name__,
                     "scheduler": self.scheduler.__class__.__name__,
-                    "scheduler_state_dict": self.scheduler.state_dict(),
+                    "scheduler_state_dict": self.scheduler.state_dict() if self.scheduler is not None else None,
                     "gradient_scaler_state_dict": self.gradient_scaler.state_dict(),
                     "current_epoch": self.current_epoch,
                 },
@@ -506,23 +506,25 @@ class StellarPerceptron:
             k: v for k, v in model_f["optimizer_state_dict"]["param_groups"][0].items() if k in optimizer_func_keywords
         })
         nn.optimizer.load_state_dict(state_dict=model_f["optimizer_state_dict"])
-
-        scheduler_func = getattr(torch.optim.lr_scheduler, model_f["scheduler"])
-        # get list of arguments of the scheduler function
-        scheduler_func_keywords = list(inspect.signature(scheduler_func).parameters.keys())
-        try:
-            scheduler_func_keywords.remove("verbose")  # deprecated keyword for scheduler
-        except ValueError:
-            pass
-        scheduler_func_args = model_f["scheduler_state_dict"]
-        try:
-            scheduler_func_args["last_epoch"] -= 1  # PyTorch scheduler last_epoch need to -1 since there is an initial run
-        except ValueError:
-            pass
-        nn.scheduler = scheduler_func(nn.optimizer, **{
-            k: v for k, v in scheduler_func_args.items() if k in scheduler_func_keywords
-        })
-        nn.scheduler.load_state_dict(model_f["scheduler_state_dict"])
+        if model_f["scheduler"] != "NoneType":
+            scheduler_func = getattr(torch.optim.lr_scheduler, model_f["scheduler"])
+            # get list of arguments of the scheduler function
+            scheduler_func_keywords = list(inspect.signature(scheduler_func).parameters.keys())
+            try:
+                scheduler_func_keywords.remove("verbose")  # deprecated keyword for scheduler
+            except ValueError:
+                pass
+            scheduler_func_args = model_f["scheduler_state_dict"]
+            try:
+                scheduler_func_args["last_epoch"] -= 1  # PyTorch scheduler last_epoch need to -1 since there is an initial run
+            except ValueError:
+                pass
+            nn.scheduler = scheduler_func(nn.optimizer, **{
+                k: v for k, v in scheduler_func_args.items() if k in scheduler_func_keywords
+            })
+            nn.scheduler.load_state_dict(model_f["scheduler_state_dict"])
+        else:
+            nn.scheduler = None
         nn.gradient_scaler.load_state_dict(model_f["gradient_scaler_state_dict"])
 
         return nn
@@ -643,7 +645,8 @@ class StellarPerceptron:
         )
 
         if self.scheduler is None:
-            self.scheduler = lr_scheduler(self.optimizer)
+            if lr_scheduler is not None:
+                self.scheduler = lr_scheduler(self.optimizer)
 
         json_path = f"{self.root_folder}/config.json"
         if not pathlib.Path(json_path).exists():
@@ -728,7 +731,8 @@ class StellarPerceptron:
                 val_generator.on_epoch_end(epoch=self.current_epoch)
 
                 # ======== post-epoch activity ========
-                self.scheduler.step()
+                if self.scheduler is not None:
+                    self.scheduler.step()
                 lr_fmt = np.format_float_scientific(
                     self.current_learning_rate, precision=4, unique=False
                 )
@@ -760,11 +764,10 @@ class StellarPerceptron:
                             warnings.warn("Training terminated due to checkpoint has been reached!")
                             break
             # ====================== Training logic ======================
-
         training_log_f.close()
         training_csv_metrics_f.close()
 
-    def predict_posterior(
+    def predict_samples(
         self,
         *,
         inputs: Union[List[float], NDArray] = None,
@@ -777,8 +780,8 @@ class StellarPerceptron:
         This function to generate posterior samples from the model
 
         Args:
-            inputs (Union[List[float], NDArray]): The input data to be perceived. The shape of the input data should be (n_samples, n_features).
-                If it is pandas DataFrame, the column names should be vacobs understood by the model.
+            inputs (Union[List[float], NDArray]): The input data to be used. The shape of the input data should be (n_samples, n_features).
+                If it is pandas DataFrame, the column names should be vacobs understood by the model. The inputs should NOT be standardized.
             input_tokens (List[Union[int, str]]): Tokens or names of input data.
             request_tokens (List[Union[int, str]]): Tokens or names of requested data.
             size (int, optional): Number of samples to generate posterior. Defaults to 10000.
@@ -788,7 +791,7 @@ class StellarPerceptron:
             np.ndarray: The size of the array will be (size, n_samples, n_requested_data)
         
         Examples:
-            >>> nn_model.predict_posterior([4700, 2.5], ["teff", "logg"], ["teff"])
+            >>> nn_model.predict_samples([4700, 2.5], ["teff", "logg"], ["teff"])
         """        
         self._built_only()
         self.torch_model.eval()
@@ -908,8 +911,8 @@ class StellarPerceptron:
         This function to generate summary statistics of posterior samples from the model
 
         Args:
-            inputs (Union[List[float], NDArray]): The input data to be perceived. The shape of the input data should be (n_samples, n_features).
-                If it is pandas DataFrame, the column names should be vacobs understood by the model.
+            inputs (Union[List[float], NDArray]): The input data to be used. The shape of the input data should be (n_samples, n_features).
+                If it is pandas DataFrame, the column names should be vacobs understood by the model.  The inputs should NOT be standardized.
             input_tokens (List[Union[int, str]]): Tokens or names of input data.
             request_tokens (List[Union[int, str]]): Tokens or names of requested data.
             batch_size (int, optional): Batch size for prediction. Defaults to 128.
@@ -940,7 +943,7 @@ class StellarPerceptron:
 
         if num_batch == 0:  # if smaller than batch_size, then do all at once
             for request_idx in range(request_tokens_num):
-                posterior = self.predict_posterior(
+                posterior = self.predict_samples(
                     inputs=inputs, 
                     input_tokens=input_tokens, 
                     request_tokens=request_tokens[:, request_idx], 
@@ -955,7 +958,7 @@ class StellarPerceptron:
                         device_type=self.device_type,
                         enabled=self.mixed_precision,
                     ):
-                        posterior = self.predict_posterior(
+                        posterior = self.predict_samples(
                             inputs=inputs[i * batch_size : i * batch_size + batch_size],
                             input_tokens=input_tokens[i * batch_size : i * batch_size + batch_size],
                             request_tokens=request_tokens[:, request_idx],
@@ -970,7 +973,7 @@ class StellarPerceptron:
             if num_batch_remainder > 0:
                 # do the remainder
                 for request_idx in range(request_tokens_num):
-                    posterior = self.predict_posterior(
+                    posterior = self.predict_samples(
                         inputs=inputs[num_batch * batch_size :],
                         input_tokens=input_tokens[num_batch * batch_size :],
                         request_tokens=request_tokens[:, request_idx],

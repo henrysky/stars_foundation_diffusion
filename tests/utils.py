@@ -19,7 +19,7 @@ def KLdivergence(x, y):
     -------
     out : float
     The estimated Kullback-Leibler divergence D(P||Q).
-    
+
     References
     ----------
     Pérez-Cruz, F. Kullback-Leibler divergence estimation of continuous distributions 
