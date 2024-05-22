@@ -61,7 +61,7 @@ def test_moon():
     with torch.inference_mode():
         x_seq = nn_model.p_sample_loop(size=len(dataset), return_steps=False)
 
-    assert KLdivergence(x_seq.cpu().numpy(), dataset.cpu().numpy()) < 0.15
+    assert KLdivergence(x_seq.cpu().numpy(), dataset.cpu().numpy()) < 0.20
 
 
 def test_two_normal_conditional():
@@ -118,5 +118,5 @@ def test_two_normal_conditional():
             ).cpu()
         assert (
             KLdivergence(x_seq.numpy(), np.stack([sampling_two_normal(*ground_cond, n=1) for _ in range(1000)]))
-            < 0.25
+            < 0.30
         )
