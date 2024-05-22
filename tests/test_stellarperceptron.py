@@ -1,11 +1,12 @@
-import torch
 import pathlib
+import shutil
+
 import numpy as np
 import pandas as pd
-
-from stellarperceptron.model import StellarPerceptron
+import torch
 from sklearn.datasets import fetch_california_housing
 
+from stellarperceptron.model import StellarPerceptron
 
 housing = fetch_california_housing()
 val_labels = np.column_stack([housing.data, housing.target])
@@ -55,7 +56,7 @@ def test_training():
     )
     assert model_path.exists()
     # delete the model in case test on local machine
-    model_path.rmdir()
+    shutil.rmtree(model_path)
 
 
 def test_inference():
