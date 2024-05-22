@@ -41,7 +41,9 @@ class ConditionalLinear(nn.Module):
         else:
             if self.cond_dim != self.dim_out and self.cond_dim != 0:
                 # since the condition is added to the time embedding, it must have the same dimension as the output so we are mapping it to the same dimension
-                warnings.warn("In ideal case, cond_dim equals to dim_out. Now cond_dim is linearly mapped to dim_out (i.e., additional trainable parameters).")
+                warnings.warn(
+                    f"In ideal case, cond_dim equals to dim_out. Now cond_dim ({self.cond_dim}) is linearly mapped to dim_out ({self.dim_out}) so you have additional trainable parameters."
+                )
                 self.cond_lin = nn.Linear(
                     self.cond_dim,
                     self.dim_out,
@@ -211,7 +213,9 @@ class ConditionalDiffusionModel(nn.Module):
         params = sum([np.prod(p.size()) for p in model_parameters])
         return params
 
-    def get_activation(self, activation: Union[str, Callable]) -> Callable[[torch.Tensor], torch.Tensor]:
+    def get_activation(
+        self, activation: Union[str, Callable]
+    ) -> Callable[[torch.Tensor], torch.Tensor]:
         if activation is None:
             activation = "relu"
         if isinstance(activation, str):
@@ -219,7 +223,9 @@ class ConditionalDiffusionModel(nn.Module):
         if callable(activation):
             return activation
         else:
-            raise ValueError("Activation function must be callable or string of PyTorch activation function")
+            raise ValueError(
+                "Activation function must be callable or string of PyTorch activation function"
+            )
 
     def _forward_simple(
         self, x: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor] = None

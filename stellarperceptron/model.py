@@ -135,7 +135,7 @@ class StellarPerceptron:
         if "cpu" in self.factory_kwargs["device"]:
             if self.mixed_precision:
                 warnings.warn(
-                    "Setting mixed_precision=False because mixed precision is not supported on CP"
+                    "Setting mixed_precision=False because mixed precision is not supported on CPU"
                 )
                 self.mixed_precision = False
         if self.compile_model:
@@ -263,7 +263,7 @@ class StellarPerceptron:
         need_tiling = data_length != len(names)
         out_tokens = np.zeros(names.shape, dtype=int)  # initialize output token array
 
-        if names.dtype == int:  # in case already tokenized, then nothing to do
+        if np.issubdtype(names.dtype, np.integer):  # in case already tokenized, then nothing to do
             out_tokens = names
             if need_tiling:
                 out_tokens = np.tile(names, (data_length, 1))
@@ -644,9 +644,8 @@ class StellarPerceptron:
             factory_kwargs=self.factory_kwargs,
         )
 
-        if self.scheduler is None:
-            if lr_scheduler is not None:
-                self.scheduler = lr_scheduler(self.optimizer)
+        if self.scheduler is None and lr_scheduler is not None:
+            self.scheduler = lr_scheduler(self.optimizer)
 
         json_path = f"{self.root_folder}/config.json"
         if not pathlib.Path(json_path).exists():
@@ -757,8 +756,7 @@ class StellarPerceptron:
                     raise ValueError("Loss is NaN, hence training terminated!")
 
                 if checkpoint_every_n_epochs > 0:
-                    # always save the one right after first epoch
-                    if self.current_epoch % checkpoint_every_n_epochs == 0 or self.current_epoch == 1:
+                    if self.current_epoch % checkpoint_every_n_epochs == 0:
                         self.save(folder_name=self.root_folder)
                         if terminate_on_checkpoint and self.current_epoch != 1:
                             warnings.warn("Training terminated due to checkpoint has been reached!")
