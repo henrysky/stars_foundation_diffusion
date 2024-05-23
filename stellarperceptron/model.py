@@ -3,6 +3,7 @@ import inspect
 import json
 import os
 import pathlib
+import re
 import subprocess
 import warnings
 from datetime import timedelta
@@ -37,6 +38,7 @@ class StellarPerceptron:
         encoder_activation=None,
         encoder_n_layers: int = 2,
         diffusion_dense_num: int = 128,
+        diffusion_n_layers: int = 3,
         diffusion_num_steps: int = 100,
         device: str = "cpu",
         dtype: torch.dtype = torch.float32,
@@ -102,6 +104,7 @@ class StellarPerceptron:
         self.encoder_n_layers = encoder_n_layers
         self.diffusion_dense_num = diffusion_dense_num
         self.diffusion_num_steps = diffusion_num_steps
+        self.diffusion_n_layers = diffusion_n_layers
 
         self.embedding_layer = NonLinearEmbedding(
             input_dim=self.vocab_size + 1,  # plus 1 special padding token
@@ -122,6 +125,7 @@ class StellarPerceptron:
             num_layers=self.encoder_n_layers,
             diffusion_dense_num=self.diffusion_dense_num,
             diffusion_num_steps=self.diffusion_num_steps,
+            diffusion_n_layers=self.diffusion_n_layers,
             **self.factory_kwargs,
         )
         if self.compile_model:
@@ -457,7 +461,7 @@ class StellarPerceptron:
             checkpoints = list(pathlib.Path(f"{folder_name}/checkpoints").glob("*.pt"))
             if len(checkpoints) == 0:
                 raise FileNotFoundError("No checkpoint found!")
-            path_to_weights = sorted(checkpoints)[-1]
+            path_to_weights = sorted(checkpoints, key=lambda filename: int(re.search(r'(\d+)', str(filename.stem)).group(1)))[-1]
         elif checkpoint_epoch < -1:
             raise ValueError("checkpoint_epoch must be >= 0")
         if not os.path.exists(folder_name):
@@ -478,6 +482,7 @@ class StellarPerceptron:
             encoder_n_layers=config["nn_config"]["encoder_n_layers"],
             # denosing diffusion probabilistic model
             diffusion_dense_num=config["ddpm_config"]["dense_num"],
+            diffusion_n_layers=config["ddpm_config"]["n_layers"],
             diffusion_num_steps=config["ddpm_config"]["num_steps"],
             # other config
             device=device,

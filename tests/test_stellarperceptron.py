@@ -36,15 +36,9 @@ def test_training():
     )
 
     nn_model.optimizer = torch.optim.AdamW(nn_model.torch_model.parameters(), lr=5.0e-3)
-
-    # There is no output labels, this model only has one output node depending what information you request
-    # Here we choose a set of labels from inputs as possible information request to quickly train this model
-    # In principle, any labels in inputs can be requested in output
     nn_model.fit(
-        # give all because some of them will be randomly chosen shuffled in random order for each stars in each epoch
         inputs=val_labels,
         inputs_name=obs_names,
-        # during training, one of these will be randomly chosen for each stars in each epoch
         outputs_name=obs_names,
         batch_size=128,
         val_batchsize_factor=10,
@@ -52,9 +46,34 @@ def test_training():
         lr_scheduler=None,
         length_range=(0, 10),
         terminate_on_nan=True,
-        checkpoint_every_n_epochs=0,
+        checkpoint_every_n_epochs=8,
     )
     assert model_path.exists()
+
+    # make sure freshly created model (and their epochs) can be loaded
+    nn_model = StellarPerceptron.load(
+        model_path,
+        checkpoint_epoch=8,
+        device=device,
+        mixed_precision=False,
+        compile_model=False,
+    )
+    assert nn_model.current_epoch == 8
+    nn_model = StellarPerceptron.load(
+        model_path,
+        checkpoint_epoch=16,
+        device=device,
+        mixed_precision=False,
+        compile_model=False,
+    )
+    assert nn_model.current_epoch == 16
+    StellarPerceptron.load(
+        model_path,
+        device=device,
+        mixed_precision=False,
+        compile_model=False,
+    )
+    assert nn_model.current_epoch == 16
     # delete the model in case test on local machine
     shutil.rmtree(model_path)
 
@@ -66,4 +85,14 @@ def test_inference():
         mixed_precision=False,
         compile_model=False,
     )
-    nn_model.predict_samples(request_tokens="MedInc", size=100)
+    # make sure the case of no input tokens work
+    pred = nn_model.predict_samples(request_tokens="MedInc", size=1000)
+    assert len(pred) == 1000
+
+    nn_high_HouseValue_pred = nn_model.predict_samples(
+        inputs=[7.0], input_tokens=["MedInc"], request_tokens="HouseValue", size=1000
+    )
+    nn_low_HouseValue_pred = nn_model.predict_samples(
+        inputs=[1.0], input_tokens=["MedInc"], request_tokens="HouseValue", size=1000
+    )
+    assert np.median(nn_high_HouseValue_pred) > np.median(nn_low_HouseValue_pred)

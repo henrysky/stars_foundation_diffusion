@@ -111,6 +111,7 @@ class ConditionalDiffusionModel(nn.Module):
         cond_dim: int = 0,
         num_steps: int = 100,
         dense_num: int = 128,
+        n_layers: int = 3,
         activation: Union[str, Callable[[torch.Tensor], torch.Tensor]] = "gelu",
         device: Union[str, torch.device] = "cpu",
         dtype: torch.dtype = torch.float32,
@@ -126,6 +127,7 @@ class ConditionalDiffusionModel(nn.Module):
             cond_dim (int, optional): condition dimension, by default 0 (no condition)
             num_steps (int, optional): number of diffusion steps, by default 100
             dense_num (int, optional): number of neurons in the dense layers, by default 128
+            n_layers (int, optional): number of dense layers, by default 3 (minimum 1)
             activation (Union[str, Callable[[torch.Tensor], torch.Tensor]], optional): activation function, by default "gelu"
             device (Union[str, torch.device], optional): device to run the model, by default "cpu"
             dtype (torch.dtype, optional): data type of the model, by default torch.float32
@@ -138,30 +140,33 @@ class ConditionalDiffusionModel(nn.Module):
         self.dim = dim
         self.cond_dim = cond_dim
         self.dense_num = dense_num
+        self.n_layers = n_layers
+        if self.n_layers < 1:
+            raise ValueError("n_layers must be at least 1")
         self.activation = self.get_activation(activation)
         self.factory_kwargs = {"device": device, "dtype": dtype}
-        self.lin1 = ConditionalLinear(
-            self.dim,
-            self.dense_num,
-            self.num_steps,
-            self.cond_dim,
-            **self.factory_kwargs,
+        self.lin_layers = nn.ModuleList(
+            [
+                ConditionalLinear(
+                    self.dim,
+                    self.dense_num,
+                    self.num_steps,
+                    self.cond_dim,
+                    **self.factory_kwargs,
+                )
+            ]
+            + [
+                ConditionalLinear(
+                    self.dense_num,
+                    self.dense_num,
+                    self.num_steps,
+                    self.cond_dim,
+                    **self.factory_kwargs,
+                )
+                for _ in range(self.n_layers - 1)
+            ]
         )
-        self.lin2 = ConditionalLinear(
-            self.dense_num,
-            self.dense_num,
-            self.num_steps,
-            self.cond_dim,
-            **self.factory_kwargs,
-        )
-        self.lin3 = ConditionalLinear(
-            self.dense_num,
-            self.dense_num,
-            self.num_steps,
-            self.cond_dim,
-            **self.factory_kwargs,
-        )
-        self.lin4 = nn.Linear(self.dense_num, self.dim, **self.factory_kwargs)
+        self.lin_out = nn.Linear(self.dense_num, self.dim, **self.factory_kwargs)
 
         # ============ diffusion parameters ============
         self.beta_start = beta_start
@@ -199,6 +204,7 @@ class ConditionalDiffusionModel(nn.Module):
             "cond_dim": self.cond_dim,
             "num_steps": self.num_steps,
             "dense_num": self.dense_num,
+            "n_layers": self.n_layers,
             "activation": self.activation.__name__,
             "beta_start": self.beta_start,
             "beta_end": self.beta_end,
@@ -230,18 +236,16 @@ class ConditionalDiffusionModel(nn.Module):
     def _forward_simple(
         self, x: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        x = self.activation(self.lin1(x, t))
-        x = self.activation(self.lin2(x, t))
-        x = self.activation(self.lin3(x, t))
-        return self.lin4(x)
+        for layer in self.lin_layers:
+            x = self.activation(layer(x, t))
+        return self.lin_out(x)
 
     def _forward_cond(
         self, x: torch.Tensor, t: torch.Tensor, cond: torch.Tensor
     ) -> torch.Tensor:
-        x = self.activation(self.lin1(x, t, cond))
-        x = self.activation(self.lin2(x, t, cond))
-        x = self.activation(self.lin3(x, t, cond))
-        return self.lin4(x)
+        for layer in self.lin_layers:
+            x = self.activation(layer(x, t, cond))
+        return self.lin_out(x)
 
     def p_sample(
         self, x: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor] = None

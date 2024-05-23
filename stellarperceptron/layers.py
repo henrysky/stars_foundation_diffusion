@@ -116,6 +116,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
         activation: Callable[[torch.Tensor], torch.Tensor],
         num_layers: int = 2,
         diffusion_dense_num: int = 128,
+        diffusion_n_layers: int = 3,
         diffusion_num_steps: int = 100,
         device: Union[str, torch.device] = "cpu",
         dtype: torch.dtype = torch.float32,
@@ -132,6 +133,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
             activation (Callable[[torch.Tensor], torch.Tensor]): activation function
             num_layers (int, optional): number of transformer encoder layers. Defaults to 2.
             diffusion_dense_num (int, optional): number of neurons in the diffusion dense layer. Defaults to 128.
+            diffusion_n_layers (int, optional): number of layers in the diffusion model. Defaults to 3.
             diffusion_num_steps (int, optional): number of diffusion steps. Defaults to 100.
             device (Union[str, torch.device], optional): device to run PyTorch on. Defaults to "cpu".
             dtype (torch.dtype, optional): data type. Defaults to torch.float32.
@@ -160,6 +162,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
             dim=1,
             cond_dim=embedding_dim,
             dense_num=diffusion_dense_num,
+            n_layers=diffusion_n_layers,
             num_steps=diffusion_num_steps,
             **self.factory_kwargs,
         )
