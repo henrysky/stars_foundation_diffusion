@@ -58,6 +58,25 @@ def shuffle_row(arrays_ls: List[NDArray], first_n: Optional[List[int]] = None) -
         return [np.take_along_axis(a, master_idx, axis=1) for a in arrays_ls]
 
 
+# def shuffle_row(arrays_ls, first_n=None) -> None:
+#     """
+#     Function to shuffle row-wise multiple 2D array of the same shape in the same way
+
+#     This function would change the original array in place!!!
+#     """
+#     array_shape = tuple(arrays_ls[0].shape)
+#     if not isinstance(arrays_ls, list):
+#         raise ValueError(
+#             "arrays_ls should be a list of arrays, even if there is only one array"
+#         )
+#     if not all([a.shape == array_shape for a in arrays_ls]):
+#         raise ValueError("All arrays should have the same shape")
+    
+#     indices = torch.argsort(torch.rand(*array_shape), dim=-1)
+#     idx = torch.arange(array_shape[0]).unsqueeze(-1)
+#     return [a[idx, indices] for a in arrays_ls]
+
+
 def random_choice(items: NDArray, prob_matrix: Optional[NDArray] = None) -> NDArray:
     """
     This function is to randomly choose an item from each row of a 2D array based on the probability matrix (if provided)
@@ -137,9 +156,9 @@ class TrainingGenerator(torch.utils.data.IterableDataset):
         else:
             self.first_n_shuffle = None
 
-        prob_matrix[bad_idx] = (
-            0.0  # don't sample those token which are missing (i.e. padding)
-        )
+        # prob_matrix[bad_idx] = (
+        #     0.0  # don't sample those token which are missing (i.e. padding)
+        # )
         self.output_prob_matrix = prob_matrix
 
         self.batch_size = batch_size
@@ -176,6 +195,51 @@ class TrainingGenerator(torch.utils.data.IterableDataset):
 
     def __len__(self):
         return self.steps_per_epoch
+
+    # def on_epoch_end(self, epoch=None):
+    #     """
+    #     Major functionality is to prepare the data for the next epoch
+
+    #     Parameters
+    #     ----------
+    #     epoch : int, optional
+    #         epoch number in case the behavior depends on epoch, by default None
+    #     """
+    #     # shuffle the row ordering list when an epoch ends to prepare for the next epoch
+    #     if self.shuffle:
+    #         rng.shuffle(self.idx_list)
+
+    #     # choose one depending on output prob matrix
+    #     output_idx = random_choice(
+    #         np.tile(self.possible_output_tokens, (self.data_length, 1)),
+    #         self.output_prob_matrix,
+    #     )
+
+    #     self.epoch_input = torch.tensor(self.input, dtype=self.factory_kwargs["dtype"], device=self.factory_kwargs["device"])
+    #     self.epoch_input_idx = torch.tensor(self.input_idx, dtype=torch.int32, device=self.factory_kwargs["device"])
+    #     self.epoch_input, self.epoch_input_idx = shuffle_row(
+    #         [self.epoch_input, self.epoch_input_idx], first_n=self.first_n_shuffle
+    #     )
+    #     # crop
+    #     self.epoch_input = self.epoch_input[:, : self.length_range[1]]
+    #     self.epoch_input_idx = self.epoch_input_idx[:, : self.length_range[1]]
+
+    #     self.epoch_input = torch.atleast_3d(self.epoch_input)[self.idx_list]
+    #     self.epoch_input_idx = torch.tensor(self.epoch_input_idx)[self.idx_list]
+    #     self.epoch_output_idx = torch.tensor(output_idx, dtype=torch.int32).to(
+    #         self.factory_kwargs["device"], non_blocking=True
+    #     )[self.idx_list]
+    #     self.epoch_output = torch.tensor(
+    #         np.take_along_axis(self.output, output_idx - 1, axis=1),
+    #         dtype=self.factory_kwargs["dtype"],
+    #     ).to(self.factory_kwargs["device"], non_blocking=True)[self.idx_list]
+    #     self.epoch_output_err = torch.tensor(
+    #         np.take_along_axis(self.output_err, output_idx - 1, axis=1),
+    #         dtype=self.factory_kwargs["dtype"],
+    #     ).to(self.factory_kwargs["device"], non_blocking=True)[self.idx_list]
+    #     self.batches_lengthes = rng.integers(
+    #         low=self.length_range[0], high=self.length_range[1], size=len(self)
+    #     )
 
     def on_epoch_end(self, epoch=None):
         """

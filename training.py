@@ -56,9 +56,15 @@ if __name__ == "__main__":
         help="Number of neurons in the diffusion dense layer",
     )
     parser.add_argument(
+        "--diffusion_n_layers",
+        type=int,
+        default=5,
+        help="Number of diffusion dense layers",
+    )
+    parser.add_argument(
         "--diffusion_num_steps",
         type=int,
-        default=100,
+        default=120,
         help="Number of diffusion steps",
     )
     parser.add_argument(
@@ -76,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_rate_min",
         type=float,
-        default=1e-8,
+        default=1e-11,
         help="Minimum learning rate for the optimizer",
     )
     parser.add_argument(
@@ -108,6 +114,7 @@ if __name__ == "__main__":
     # load training data
     # xp_apogee = h5py.File("./data_files/training_set.h5", mode="r")
     xp_apogee = h5py.File("./data_files/training_set.h5", mode="r")
+    good_idx = (~np.isnan(xp_apogee["raw"]["teff"][()]) & ~np.isnan(xp_apogee["raw"]["logg"][()]))
     xp_relevancy = xp_apogee["raw"]["xp_relevancy"][()]
     xp_coeffs_gnorm = xp_apogee["raw"]["xp_coeffs_gnorm"][()]
     xp_coeffs_err_gnorm = xp_apogee["raw"]["xp_coeffs_gnorm_err"][()]
@@ -130,7 +137,7 @@ if __name__ == "__main__":
             xp_apogee["raw"]["logc19"][()],
             xp_apogee["raw"]["g_fakemag"][()],
         ]
-    )
+    )[good_idx]
 
     print("Number of training stars: ", len(training_labels))
 
@@ -146,7 +153,7 @@ if __name__ == "__main__":
             xp_apogee["raw"]["logc19_err"][()],
             xp_apogee["raw"]["g_fakemag_err"][()],
         ]
-    )
+    )[good_idx]
     xp_apogee.close()
     training_labels_err = np.where(np.isnan(training_labels_err), 0.0, training_labels_err)
 
@@ -203,6 +210,7 @@ if __name__ == "__main__":
             "logebv",
             "g_fakemag",
         ],
+        length_range=(0, 64),
         batch_size=args.batch_size,
         val_batchsize_factor=10,
         epochs=args.epochs,

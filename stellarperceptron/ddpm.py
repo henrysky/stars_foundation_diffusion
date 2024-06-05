@@ -330,8 +330,9 @@ class ConditionalDiffusionModel(nn.Module):
         # model input
         x = x_0 * a + e * am1
         output = self(x, t, cond_x)
+        output = torch.where(torch.isnan(output), e, output)
         loss = torch.nn.functional.mse_loss(output, e)
-        return loss
+        return loss * (batch_size / torch.count_nonzero(~torch.isnan(torch.sum(x_0, dim=1))))
 
     def make_beta_schedule(self, schedule: str = "linear") -> torch.Tensor:
         if schedule == "linear":
