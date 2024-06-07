@@ -132,6 +132,19 @@ class StellarPerceptron:
             self.torch_model.compile(fullgraph=True)
         # ====================== Model initialization ======================
 
+        # ipython Auto-completion
+        try:
+            from IPython import get_ipython
+            def list_all_vocabs_completer(ipython, event):
+                out = self.vocabs
+                return out
+            get_ipython().set_hook("complete_command", list_all_vocabs_completer,
+                                   re_key=".*predict_samples")
+            get_ipython().set_hook("complete_command", list_all_vocabs_completer,
+                                   re_key=".*predict_summary")
+        except:
+            pass
+
     def torch_checklist(self):
         """
         Basic checklist for PyTorch
