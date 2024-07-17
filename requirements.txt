@@ -10,10 +10,9 @@ pandas
 h5py
 beautifulsoup4
 requests
-sympy
-pyyaml
-jinja2
 pytest
+ipython
+ipykernel
 GaiaXPy
 gaiadr3_zeropoint
 MyGaiaDB

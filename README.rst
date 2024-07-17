@@ -41,12 +41,13 @@ Python dependencies are listed in `requirements.txt`_.
 Docker Image
 ----------------
 
-If you have `Docker`_ installed, you can use the `Dockerfile`_ to build a Docker image with all dependencies installed and data files downloaded.
+If you have `Docker`_ installed, you can use the `Dockerfile`_ to build a Docker image upon Pytorch container from `NVIDIA NGC Catalog`_ with all dependencies installed and data files downloaded.
 
+.. _NVIDIA NGC Catalog: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch
 .. _Dockerfile: Dockerfile
 .. _Docker: https://www.docker.com/
 
-To build the Docker image, run the following command in the root directory of this repository:
+To build the Docker image called ``stars_foundation_diffusion``, run the following command in the root directory of this repository:
 
 .. code-block:: bash
 
@@ -56,13 +57,15 @@ To run the Docker container with all GPU available to the container named ``test
 
 .. code-block:: bash
     
-    docker run --gpus all --name testing123 -dit  -e SHELL=/bin/bash --entrypoint bash stars_foundation_diffusion
+    docker run --gpus all --name testing123 -it -e SHELL=/bin/bash --entrypoint bash stars_foundation_diffusion
 
 Then you can attach to the container by running:
 
 .. code-block:: bash
 
     docker exec -it testing123 bash
+
+Now you can run all notebooks or training script inside the container
 
 Jupyter Notebooks
 --------------------------------------------------------
