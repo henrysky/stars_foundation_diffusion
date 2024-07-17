@@ -3,8 +3,8 @@ FROM nvcr.io/nvidia/pytorch:24.06-py3
 ENV DEBIAN_FRONTEND=noninteractive 
 RUN apt update
 RUN apt install -y texlive-full
-RUN git clone https://github.com/henrysky/astroNN_foundation_diffusion
-WORKDIR astroNN_foundation_diffusion
+RUN git clone https://github.com/henrysky/stars_foundation_diffusion
+WORKDIR stars_foundation_diffusion
 RUN pip install -r requirements.txt
 RUN mkdir -p data_files
 RUN curl --cookie zenodo-cookies.txt "https://zenodo.org/records/12738256/files/testing_set.h5?download=1" --output data_files/testing_set.h5

@@ -13,6 +13,7 @@ requests
 pytest
 ipython
 ipykernel
+astroNN
 GaiaXPy
 gaiadr3_zeropoint
 MyGaiaDB

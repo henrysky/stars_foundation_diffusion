@@ -38,6 +38,15 @@ Python dependencies are listed in `requirements.txt`_.
 
 .. _configuration file: https://astronn.readthedocs.io/en/latest/quick_start.html#configuration-file
 
+Datasets
+---------------
+
+Datasets are available on `Zenodo`_ and should be placed in the folder named ``data_files`` under the root directory of this repository.
+
+.. _Zenodo: https://zenodo.org/records/12738256
+
+If you are planning to use the Docker image, the data files are already downloaded and placed in the correct folder in the container.
+
 Docker Image
 ----------------
 
