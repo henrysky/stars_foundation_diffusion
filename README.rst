@@ -94,7 +94,7 @@ Jupyter Notebooks
 .. _Dataset_Reduction.ipynb: Dataset_Reduction.ipynb
 .. _Inference.ipynb: Inference.ipynb
 .. _DDPM.ipynb: DDPM.ipynb
-.. _DDPM_conditional.ipynb: DDPM_conditional.ipynb
+.. _DDPM_Conditional.ipynb: DDPM_Conditional.ipynb
 .. _California_Housing.ipynb: California_Housing.ipynb
 
 Python Script
