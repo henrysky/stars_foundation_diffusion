@@ -8,9 +8,9 @@ and multimodal. In this work, we demonstrate that training a probabilistic model
 the Transformer provides reasonable probability density estimation even for high-dimensional inputs. The combined 
 Transformer+Denoising Diffusion model allows conditioning the output probability density on arbitrary combinations of inputs 
 and it is thus a highly flexible density function emulator of all possible input/output combinations. We illustrate our
- Transformer+Denoising Diffusion model by training it on a large dataset of astronomical observations and measured labels of 
- stars within our Galaxy and we apply it to a variety of inference tasks to show that the model can infer labels accurately 
- with reasonable distributions.
+Transformer+Denoising Diffusion model by training it on a large dataset of astronomical observations and measured labels of 
+stars within our Galaxy and we apply it to a variety of inference tasks to show that the model can infer labels accurately 
+with reasonable distributions.
 
 Getting Started
 ================
