@@ -12,6 +12,13 @@ Transformer+Denoising Diffusion model by training it on a large dataset of astro
 stars within our Galaxy and we apply it to a variety of inference tasks to show that the model can infer labels accurately 
 with reasonable distributions.
 
+.. raw:: html
+
+   <p align="center">
+     <img width="200" src="encoder_ddpm.png">
+   </p>
+
+
 Getting Started
 ================
 
@@ -108,6 +115,18 @@ Delete the file before you share your model with others if you concern about pri
     | Python script to train the model.
 
 .. _training.py: training.py
+
+To train the model with mixed precision and ``torch.compile()``, run the following command in the root directory of this repository:
+
+.. code-block:: bash
+
+    python training.py --mixed_precision --compile_model
+
+To see all available arguments, run:
+
+.. code-block:: bash
+
+    python training.py --help
 
 Models
 --------------------------------------------------------
