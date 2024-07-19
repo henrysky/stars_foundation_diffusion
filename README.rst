@@ -18,6 +18,8 @@ with reasonable distributions.
      <img width="200" src="encoder_ddpm.png">
    </p>
 
+.. contents:: **Table of Contents**
+    :depth: 3
 
 Getting Started
 ================
