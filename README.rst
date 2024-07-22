@@ -161,10 +161,13 @@ Authors
 
 -  | **Jo Bovy** - jobovy_
    | Department of Astronomy and Astrophysics, University of Toronto
-   | Contact Jo: bovy [at] astro.utoronto.ca
+
+-  | **Josh Speagle** - joshspeagle_
+   | Department of Astronomy and Astrophysics, University of Toronto
 
 .. _henrysky: https://github.com/henrysky
 .. _jobovy: https://github.com/jobovy
+.. _joshspeagle: https://github.com/joshspeagle
 
 License
 ---------
