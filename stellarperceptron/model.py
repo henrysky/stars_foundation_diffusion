@@ -29,7 +29,7 @@ class StellarPerceptron:
     def __init__(
         self,
         vocabs: List[str],
-        vocab_tokens: List[int] = None,
+        vocab_tokens: Optional[List[int]] = None,
         embedding_dim: int = 32,
         embedding_activation=None,
         encoder_head_num: int = 2,
@@ -51,11 +51,12 @@ class StellarPerceptron:
         self._built = built
         # only grab version, without cpu/cuda detail
         self.backend_framewoark = f"torch-{torch.__version__[:5]}"
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+        self.device = device
+        self.dtype = dtype
         self.mixed_precision = mixed_precision
         self.compile_model = compile_model
         self.system_info = {}
-        if "cuda" in self.factory_kwargs["device"]:
+        if "cuda" in self.device:
             self.device_type = "cuda"
         else:
             self.device_type = device
@@ -142,8 +143,12 @@ class StellarPerceptron:
                                    re_key=".*predict_samples")
             get_ipython().set_hook("complete_command", list_all_vocabs_completer,
                                    re_key=".*predict_summary")
-        except:
+        except AttributeError or ImportError:
             pass
+
+    @property
+    def factory_kwargs(self) -> dict:
+        return {"device": self.device, "dtype": self.dtype}
 
     def torch_checklist(self):
         """
@@ -180,14 +185,6 @@ class StellarPerceptron:
         """
         if not self._built:
             raise NotImplementedError("This model is not trained")
-
-    def clear_perception(self) -> None:
-        """
-        Clear the perception memory
-        """
-        # delete self._perception_memory in case it lives on VRAM
-        del self._perception_memory
-        self._perception_memory = None
 
     def _fit_checklist(
         self,

@@ -35,7 +35,8 @@ class ConditionalLinear(nn.Module):
         self.dim_out = dim_out
         self.t = t
         self.cond_dim = cond_dim
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+        self.device = device
+        self.dtype = dtype
         if self.cond_dim < 0:
             raise ValueError("cond_dim must be non-negative")
         else:
@@ -68,6 +69,10 @@ class ConditionalLinear(nn.Module):
 
         # if no condition is provided, use this zero tensor to NOT modify the time embedding
         self.a_zero = torch.zeros(1, **self.factory_kwargs)
+
+    @property
+    def factory_kwargs(self) -> dict:
+        return {"device": self.device, "dtype": self.dtype}
 
     def time_forward(self, x: torch.Tensor, t: torch.Tensor, cond: torch.Tensor):
         """
@@ -144,7 +149,8 @@ class ConditionalDiffusionModel(nn.Module):
         if self.n_layers < 1:
             raise ValueError("n_layers must be at least 1")
         self.activation = self.get_activation(activation)
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+        self.device = device
+        self.dtype = dtype
         self.lin_layers = nn.ModuleList(
             [
                 ConditionalLinear(
@@ -194,6 +200,10 @@ class ConditionalDiffusionModel(nn.Module):
             self.forward = self._forward_cond
         else:
             self.forward = self._forward_simple
+
+    @property
+    def factory_kwargs(self) -> dict:
+        return {"device": self.device, "dtype": self.dtype}
 
     def get_config(self) -> dict:
         """

@@ -72,7 +72,8 @@ class NonLinearEmbedding(nn.Module):
         # always reserve token 0 as special padding token
         self.padding_idx = 0
 
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+        self.device = device
+        self.dtype = dtype
 
         self.embeddings = Parameter(
             torch.empty((self.input_dim, self.output_dim), **self.factory_kwargs)
@@ -81,6 +82,10 @@ class NonLinearEmbedding(nn.Module):
             torch.empty((self.input_dim, self.output_dim), **self.factory_kwargs)
         )
         self.reset_parameters()
+
+    @property
+    def factory_kwargs(self) -> dict:
+        return {"device": self.device, "dtype": self.dtype}
 
     def reset_parameters(self):
         self.embeddings_initializer(self.embeddings)
@@ -139,7 +144,8 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
             dtype (torch.dtype, optional): data type. Defaults to torch.float32.
         """
         super().__init__()
-        self.factory_kwargs = {"device": device, "dtype": dtype}
+        self.device = device
+        self.dtype = dtype
         self.embedding_layer = embedding_layer
         self.activation = get_activation(activation)
 
@@ -166,6 +172,10 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
             num_steps=diffusion_num_steps,
             **self.factory_kwargs,
         )
+
+    @property
+    def factory_kwargs(self) -> dict:
+        return {"device": self.device, "dtype": self.dtype}
 
     def get_config(self) -> dict:
         return {
