@@ -3,7 +3,7 @@ astropy
 astroquery
 tqdm
 scikit-learn
-torch
+torch>=2.3
 matplotlib
 packaging
 pandas

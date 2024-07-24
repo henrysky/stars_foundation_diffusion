@@ -88,7 +88,7 @@ class StellarPerceptron:
         self.optimizer = None  # optimizer
         self.scheduler = None  # learning rate scheduler
         # always scale the gradients if using cuda
-        self.gradient_scaler = torch.cuda.amp.GradScaler(enabled=self.device_type == "cuda")
+        self.gradient_scaler = torch.GradScaler(device=self.device, enabled=self.device_type == "cuda")
 
         self.root_folder = pathlib.Path(folder).resolve()
         # only do when not loading trained model, prevent any overwriting to exisitng model folder
@@ -506,7 +506,7 @@ class StellarPerceptron:
         nn._input_std = np.array(config["norm_config"]["_input_std"])
         nn._input_standardized = np.array(config["norm_config"]["_input_standardized"])
 
-        model_f = torch.load(path_to_weights, map_location=device)
+        model_f = torch.load(path_to_weights, map_location=device, weights_only=True)
         nn.torch_model.load_state_dict(
             model_f["model_state_dict"],
             strict=True,
