@@ -1,5 +1,6 @@
 import pathlib
 import shutil
+import pytest
 
 import numpy as np
 import pandas as pd
@@ -8,14 +9,23 @@ from sklearn.datasets import fetch_california_housing
 
 from stellarperceptron.model import StellarPerceptron
 
-housing = fetch_california_housing()
-val_labels = np.column_stack([housing.data, housing.target])
-obs_names = housing.feature_names + ["HouseValue"]
-val_labels_df = pd.DataFrame(val_labels, columns=obs_names)
-device = "cpu"
+
+@pytest.fixture(scope="module")
+def device():
+    return "cpu"
 
 
-def test_training():
+@pytest.fixture(scope="module")
+def housing():
+    housing = fetch_california_housing()
+    val_labels = np.column_stack([housing.data, housing.target])
+    obs_names = housing.feature_names + ["HouseValue"]
+    val_labels_df = pd.DataFrame(val_labels, columns=obs_names)
+    return val_labels_df, obs_names
+
+
+def test_training(device, housing):
+    val_labels_df, obs_names = housing
     model_path = pathlib.Path("test_california_model")
 
     nn_model = StellarPerceptron(
@@ -37,7 +47,7 @@ def test_training():
 
     nn_model.optimizer = torch.optim.AdamW(nn_model.torch_model.parameters(), lr=5.0e-3)
     nn_model.fit(
-        inputs=val_labels,
+        inputs=val_labels_df[obs_names].values,
         inputs_name=obs_names,
         outputs_name=obs_names,
         batch_size=128,
@@ -78,7 +88,7 @@ def test_training():
     shutil.rmtree(model_path)
 
 
-def test_inference():
+def test_inference(device):
     nn_model = StellarPerceptron.load(
         "./trained_california_model/",
         device=device,

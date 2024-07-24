@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 import tqdm
 from sklearn.datasets import make_moons
@@ -6,7 +7,10 @@ from utils import KLdivergence
 
 from stellarperceptron.ddpm import ConditionalDiffusionModel
 
-device = "cpu"
+
+@pytest.fixture(scope="module")
+def device():
+    return "cpu"
 
 
 def sampling_two_normal(x1, y1, s1, x2, y2, s2, n=1000):
@@ -20,21 +24,19 @@ def sampling_two_normal(x1, y1, s1, x2, y2, s2, n=1000):
         x2 (float): mean of the second normal distribution
         y2 (float): mean of the second normal distribution
         s2 (float): standard deviation of the second normal distribution
-        n (int): number of samples
+        n (int): number of samples, must be even if larger than 1
 
     Returns:
-        np.ndarray: samples from the two normal distributions
+        np.ndarray: n samples from the two normal distributions.
     """
-    x1 = np.concatenate([np.random.normal(x1, s1, n), np.random.normal(y1, s2, n)])
-    x2 = np.concatenate([np.random.normal(x2, s1, n), np.random.normal(y2, s2, n)])
-    r = np.random.choice([0, 1], 1)[0]
-    if r == 0:
-        return x1
-    else:
-        return x2
+    d1 = np.concatenate([np.random.normal(x1, s1, n), np.random.normal(y1, s2, n)])
+    d2 = np.concatenate([np.random.normal(x2, s2, n), np.random.normal(y2, s2, n)])
+    final_arr = np.column_stack([d1, d2])
+    np.random.shuffle(final_arr)
+    return final_arr[:n]
 
 
-def test_moon():
+def test_moon(device):
     nn_model = ConditionalDiffusionModel(
         dim=2, cond_dim=0, dense_num=128, num_steps=100, beta_end=1.0e-2, device=device
     )
@@ -64,7 +66,7 @@ def test_moon():
     assert KLdivergence(x_seq.cpu().numpy(), dataset.cpu().numpy()) < 0.20
 
 
-def test_two_normal_conditional():
+def test_two_normal_conditional(device):
     nn_model = ConditionalDiffusionModel(
         dim=2, cond_dim=6, dense_num=128, num_steps=100, beta_end=5.0e-2, device=device
     )
@@ -117,6 +119,9 @@ def test_two_normal_conditional():
                 return_steps=False,
             ).cpu()
         assert (
-            KLdivergence(x_seq.numpy(), np.stack([sampling_two_normal(*ground_cond, n=1) for _ in range(1000)]))
+            KLdivergence(
+                x_seq.numpy(),
+                np.stack(sampling_two_normal(*ground_cond, n=1000)),
+            )
             < 0.30
         )
