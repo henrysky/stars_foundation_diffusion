@@ -9,7 +9,7 @@ from .ddpm import ConditionalDiffusionModel
 
 
 def get_initializer(
-    initializer: Union[str, Callable[[torch.Tensor], torch.Tensor]],
+    initializer: Optional[Union[str, Callable[[torch.Tensor], torch.Tensor]]],
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     if initializer is None:
         initializer = "xavier_uniform_"
@@ -22,7 +22,7 @@ def get_initializer(
 
 
 def get_activation(
-    activation: Union[str, Callable[[torch.Tensor], torch.Tensor]],
+    activation: Optional[Union[str, Callable[[torch.Tensor], torch.Tensor]]],
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     if activation is None:
         activation = "relu"
@@ -125,6 +125,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
         diffusion_num_steps: int = 100,
         device: Union[str, torch.device] = "cpu",
         dtype: torch.dtype = torch.float32,
+        built: bool = False,  # do not use this arguement, it is for internal use only
     ):
         """
         Model with transformer encoder layers and diffusion model as head
@@ -148,6 +149,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
         self.dtype = dtype
         self.embedding_layer = embedding_layer
         self.activation = get_activation(activation)
+        self._built = built
 
         self.encoder_transformer_blocks = nn.ModuleList(
             [
@@ -170,6 +172,7 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
             dense_num=diffusion_dense_num,
             n_layers=diffusion_n_layers,
             num_steps=diffusion_num_steps,
+            built=self._built,
             **self.factory_kwargs,
         )
 
@@ -215,8 +218,6 @@ class StellarPerceptronTorchModelwDDPM(nn.Module):
         out = self(input_tensor, input_token_tensor, y_token_tensor)
 
         # diffusion loss
-        diffusion_loss = self.diffusion_head.noise_estimation_loss(
-            y_tensor, out
-        )
+        diffusion_loss = self.diffusion_head.noise_estimation_loss(y_tensor, out)
 
         return diffusion_loss

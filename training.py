@@ -114,7 +114,9 @@ if __name__ == "__main__":
     # load training data
     # xp_apogee = h5py.File("./data_files/training_set.h5", mode="r")
     xp_apogee = h5py.File("./data_files/training_set.h5", mode="r")
-    good_idx = (~np.isnan(xp_apogee["raw"]["teff"][()]) & ~np.isnan(xp_apogee["raw"]["logg"][()]))
+    good_idx = ~np.isnan(xp_apogee["raw"]["teff"][()]) & ~np.isnan(
+        xp_apogee["raw"]["logg"][()]
+    )
     xp_relevancy = xp_apogee["raw"]["xp_relevancy"][()]
     xp_coeffs_gnorm = xp_apogee["raw"]["xp_coeffs_gnorm"][()]
     xp_coeffs_err_gnorm = xp_apogee["raw"]["xp_coeffs_gnorm_err"][()]
@@ -155,7 +157,9 @@ if __name__ == "__main__":
         ]
     )[good_idx]
     xp_apogee.close()
-    training_labels_err = np.where(np.isnan(training_labels_err), 0.0, training_labels_err)
+    training_labels_err = np.where(
+        np.isnan(training_labels_err), 0.0, training_labels_err
+    )
 
     obs_names = [
         *[f"bp{i}" for i in range(55)],

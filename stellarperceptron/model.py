@@ -7,7 +7,7 @@ import re
 import subprocess
 import warnings
 from datetime import timedelta
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -58,6 +58,10 @@ class StellarPerceptron:
         self.system_info = {}
         if "cuda" in self.device:
             self.device_type = "cuda"
+        if (
+            "mps" in self.device
+        ):  # autocast is not well-supported on mps, so set to CPU for now
+            self.device_type = "cpu"
         else:
             self.device_type = device
         self.torch_checklist()
@@ -88,7 +92,9 @@ class StellarPerceptron:
         self.optimizer = None  # optimizer
         self.scheduler = None  # learning rate scheduler
         # always scale the gradients if using cuda
-        self.gradient_scaler = torch.GradScaler(device=self.device, enabled=self.device_type == "cuda")
+        self.gradient_scaler = torch.GradScaler(
+            device=self.device, enabled=self.device_type == "cuda"
+        )
 
         self.root_folder = pathlib.Path(folder).resolve()
         # only do when not loading trained model, prevent any overwriting to exisitng model folder
@@ -127,6 +133,7 @@ class StellarPerceptron:
             diffusion_dense_num=self.diffusion_dense_num,
             diffusion_num_steps=self.diffusion_num_steps,
             diffusion_n_layers=self.diffusion_n_layers,
+            built=self._built,
             **self.factory_kwargs,
         )
         if self.compile_model:
@@ -136,15 +143,25 @@ class StellarPerceptron:
         # ipython Auto-completion
         try:
             from IPython import get_ipython
-            def list_all_vocabs_completer(ipython, event):
-                out = self.vocabs
-                return out
-            get_ipython().set_hook("complete_command", list_all_vocabs_completer,
-                                   re_key=".*predict_samples")
-            get_ipython().set_hook("complete_command", list_all_vocabs_completer,
-                                   re_key=".*predict_summary")
-        except AttributeError or ImportError:
+        except ImportError:
             pass
+        else:
+            if (ipy := get_ipython()) is not None:
+
+                def list_all_vocabs_completer(ipython, event):
+                    out = self.vocabs
+                    return out
+
+                ipy.set_hook(
+                    "complete_command",
+                    list_all_vocabs_completer,
+                    re_key=".*predict_samples",
+                )
+                ipy.set_hook(
+                    "complete_command",
+                    list_all_vocabs_completer,
+                    re_key=".*predict_summary",
+                )
 
     @property
     def factory_kwargs(self) -> dict:
@@ -277,7 +294,9 @@ class StellarPerceptron:
         need_tiling = data_length != len(names)
         out_tokens = np.zeros(names.shape, dtype=int)  # initialize output token array
 
-        if np.issubdtype(names.dtype, np.integer):  # in case already tokenized, then nothing to do
+        if np.issubdtype(
+            names.dtype, np.integer
+        ):  # in case already tokenized, then nothing to do
             out_tokens = names
             if need_tiling:
                 out_tokens = np.tile(names, (data_length, 1))
@@ -424,7 +443,9 @@ class StellarPerceptron:
                     "optimizer_state_dict": self.optimizer.state_dict(),
                     "optimizer": self.optimizer.__class__.__name__,
                     "scheduler": self.scheduler.__class__.__name__,
-                    "scheduler_state_dict": self.scheduler.state_dict() if self.scheduler is not None else None,
+                    "scheduler_state_dict": self.scheduler.state_dict()
+                    if self.scheduler is not None
+                    else None,
                     "gradient_scaler_state_dict": self.gradient_scaler.state_dict(),
                     "current_epoch": self.current_epoch,
                 },
@@ -460,8 +481,16 @@ class StellarPerceptron:
         device : str
             device to load the model to
         """
+        if not os.path.exists(folder_name):
+            raise FileNotFoundError(f"Model folder {folder_name} not found!")
+        else:
+            with open(f"{folder_name}/config.json", "r") as f:
+                config = json.load(f)
+
         if checkpoint_epoch != -1:
-            path_to_weights = pathlib.Path(f"{folder_name}/checkpoints/epoch_{checkpoint_epoch}.pt").resolve()
+            path_to_weights = pathlib.Path(
+                f"{folder_name}/checkpoints/epoch_{checkpoint_epoch}.pt"
+            ).resolve()
             if not path_to_weights.exists():
                 raise FileNotFoundError(
                     f"Checkpoint at epoch {checkpoint_epoch} not found at {path_to_weights}!"
@@ -471,14 +500,12 @@ class StellarPerceptron:
             checkpoints = list(pathlib.Path(f"{folder_name}/checkpoints").glob("*.pt"))
             if len(checkpoints) == 0:
                 raise FileNotFoundError("No checkpoint found!")
-            path_to_weights = sorted(checkpoints, key=lambda filename: int(re.search(r'(\d+)', str(filename.stem)).group(1)))[-1]
-        elif checkpoint_epoch < -1:
-            raise ValueError("checkpoint_epoch must be >= 0")
-        if not os.path.exists(folder_name):
-            raise FileNotFoundError
-        else:
-            with open(f"{folder_name}/config.json", "r") as f:
-                config = json.load(f)
+            path_to_weights = sorted(
+                checkpoints,
+                key=lambda filename: int(
+                    re.search(r"(\d+)", str(filename.stem)).group(1)
+                ),
+            )[-1]
 
         nn = cls(
             vocabs=config["tokenizer_config"]["vocabs"],
@@ -515,28 +542,46 @@ class StellarPerceptron:
 
         # lookup optimizer name in state dict and instantiate it
         optimizer_func = getattr(torch.optim, model_f["optimizer"])
-        optimizer_func_keywords = list(inspect.signature(optimizer_func).parameters.keys())
+        optimizer_func_keywords = list(
+            inspect.signature(optimizer_func).parameters.keys()
+        )
         optimizer_func_keywords.remove("params")
-        nn.optimizer = optimizer_func(params=nn.torch_model.parameters(), **{
-            k: v for k, v in model_f["optimizer_state_dict"]["param_groups"][0].items() if k in optimizer_func_keywords
-        })
+        nn.optimizer = optimizer_func(
+            params=nn.torch_model.parameters(),
+            **{
+                k: v
+                for k, v in model_f["optimizer_state_dict"]["param_groups"][0].items()
+                if k in optimizer_func_keywords
+            },
+        )
         nn.optimizer.load_state_dict(state_dict=model_f["optimizer_state_dict"])
         if model_f["scheduler"] != "NoneType":
             scheduler_func = getattr(torch.optim.lr_scheduler, model_f["scheduler"])
             # get list of arguments of the scheduler function
-            scheduler_func_keywords = list(inspect.signature(scheduler_func).parameters.keys())
+            scheduler_func_keywords = list(
+                inspect.signature(scheduler_func).parameters.keys()
+            )
             try:
-                scheduler_func_keywords.remove("verbose")  # deprecated keyword for scheduler
+                scheduler_func_keywords.remove(
+                    "verbose"
+                )  # deprecated keyword for scheduler
             except ValueError:
                 pass
             scheduler_func_args = model_f["scheduler_state_dict"]
             try:
-                scheduler_func_args["last_epoch"] -= 1  # PyTorch scheduler last_epoch need to -1 since there is an initial run
+                scheduler_func_args["last_epoch"] -= (
+                    1  # PyTorch scheduler last_epoch need to -1 since there is an initial run
+                )
             except ValueError:
                 pass
-            nn.scheduler = scheduler_func(nn.optimizer, **{
-                k: v for k, v in scheduler_func_args.items() if k in scheduler_func_keywords
-            })
+            nn.scheduler = scheduler_func(
+                nn.optimizer,
+                **{
+                    k: v
+                    for k, v in scheduler_func_args.items()
+                    if k in scheduler_func_keywords
+                },
+            )
             nn.scheduler.load_state_dict(model_f["scheduler_state_dict"])
         else:
             nn.scheduler = None
@@ -590,17 +635,22 @@ class StellarPerceptron:
         # check if the file exists
         if not pathlib.Path(training_csv_metrics_path).exists():
             training_csv_metrics_f = open(training_csv_metrics_path, "w")
-            training_csv_metrics_f.write("time,loss,mse_loss,val_loss,val_mse_loss,lr\n")
+            training_csv_metrics_f.write(
+                "time,loss,mse_loss,val_loss,val_mse_loss,lr\n"
+            )
         else:
             training_csv_metrics_f = open(training_csv_metrics_path, "a+")
 
         system_info_path = f"{self.root_folder}/training_system_info.log"
         # check if the file exists
         if not pathlib.Path(system_info_path).exists():
-            with open(f"{self.root_folder}/training_system_info.log", "w") as system_info_f:
+            with open(
+                f"{self.root_folder}/training_system_info.log", "w"
+            ) as system_info_f:
                 system_info_f.write(
                     subprocess.run(
-                        ["python", "-m", "torch.utils.collect_env"], stdout=subprocess.PIPE
+                        ["python", "-m", "torch.utils.collect_env"],
+                        stdout=subprocess.PIPE,
                     ).stdout.decode("utf-8")
                 )
 
@@ -669,7 +719,12 @@ class StellarPerceptron:
 
         # ====================== Training logic ======================
         elapsed_time = 0
-        with tqdm.tqdm(range(self.current_epoch, self.epochs), total=self.epochs, initial=self.current_epoch, unit="epoch") as pbar:
+        with tqdm.tqdm(
+            range(self.current_epoch, self.epochs),
+            total=self.epochs,
+            initial=self.current_epoch,
+            unit="epoch",
+        ) as pbar:
             for epoch in pbar:
                 self.current_epoch = epoch + 1
                 # print(f"Epoch {self.epoch}/{self.epochs}")
@@ -774,7 +829,9 @@ class StellarPerceptron:
                     if self.current_epoch % checkpoint_every_n_epochs == 0:
                         self.save(folder_name=self.root_folder)
                         if terminate_on_checkpoint and self.current_epoch != 1:
-                            warnings.warn("Training terminated due to checkpoint has been reached!")
+                            warnings.warn(
+                                "Training terminated due to checkpoint has been reached!"
+                            )
                             break
             # ====================== Training logic ======================
         training_log_f.close()
@@ -799,13 +856,13 @@ class StellarPerceptron:
             request_tokens (List[Union[int, str]]): Tokens or names of requested data.
             size (int, optional): Number of samples to generate posterior. Defaults to 10000.
             batch_size (int, optional): Batch size for prediction. Defaults to 128.
-        
+
         Returns:
             np.ndarray: The size of the array will be (size, n_samples, n_requested_data)
-        
+
         Examples:
             >>> nn_model.predict_samples([4700, 2.5], ["teff", "logg"], ["teff"])
-        """        
+        """
         self._built_only()
         self.torch_model.eval()
         if isinstance(request_tokens, list) and len(request_tokens) > 1:
@@ -930,13 +987,13 @@ class StellarPerceptron:
             request_tokens (List[Union[int, str]]): Tokens or names of requested data.
             batch_size (int, optional): Batch size for prediction. Defaults to 128.
             size (int, optional): Number of samples to generate posterior. Defaults to 10000.
-        
+
         Returns:
             pd.DataFrame: The size of the array will be (n_samples, 2 * n_requested_data), where the first half is the median and the second half is the MAD standard deviation
-        
+
         Examples:
             >>> nn_model.predict_summary([4700, 2.5], ["teff", "logg"], "teff")
-        """        
+        """
         if inputs is None:
             inputs = [-9999.99]
             input_tokens = [0]
@@ -957,47 +1014,56 @@ class StellarPerceptron:
         if num_batch == 0:  # if smaller than batch_size, then do all at once
             for request_idx in range(request_tokens_num):
                 posterior = self.predict_samples(
-                    inputs=inputs, 
-                    input_tokens=input_tokens, 
-                    request_tokens=request_tokens[:, request_idx], 
-                    size=size
+                    inputs=inputs,
+                    input_tokens=input_tokens,
+                    request_tokens=request_tokens[:, request_idx],
+                    size=size,
                 )
                 median_ls[:, request_idx] = np.median(posterior, axis=0)
                 mad_std_ls[:, request_idx] = mad_std(posterior, axis=0)
         else:
-            for request_idx in range(request_tokens_num):
-                for i in range(num_batch):
-                    with torch.autocast(
-                        device_type=self.device_type,
-                        enabled=self.mixed_precision,
-                    ):
+            # tqdm progress bar, will update manually
+            with tqdm.tqdm(
+                total=request_tokens_num * data_len,
+                unit="samples",
+            ) as pbar:
+                for request_idx in range(request_tokens_num):
+                    for i in range(num_batch):
+                        with torch.autocast(
+                            device_type=self.device_type,
+                            enabled=self.mixed_precision,
+                        ):
+                            posterior = self.predict_samples(
+                                inputs=inputs[i * batch_size : i * batch_size + batch_size],
+                                input_tokens=input_tokens[
+                                    i * batch_size : i * batch_size + batch_size
+                                ],
+                                request_tokens=request_tokens[:, request_idx],
+                                size=size,
+                            )
+                            median_ls[
+                                i * batch_size : i * batch_size + batch_size, request_idx
+                            ] = np.median(posterior, axis=0)
+                            mad_std_ls[
+                                i * batch_size : i * batch_size + batch_size, request_idx
+                            ] = mad_std(posterior, axis=0)
+                            pbar.update(batch_size)
+                if num_batch_remainder > 0:
+                    # do the remainder
+                    for request_idx in range(request_tokens_num):
                         posterior = self.predict_samples(
-                            inputs=inputs[i * batch_size : i * batch_size + batch_size],
-                            input_tokens=input_tokens[i * batch_size : i * batch_size + batch_size],
+                            inputs=inputs[num_batch * batch_size :],
+                            input_tokens=input_tokens[num_batch * batch_size :],
                             request_tokens=request_tokens[:, request_idx],
                             size=size,
                         )
-                        median_ls[
-                            i * batch_size : i * batch_size + batch_size, request_idx
-                        ] = np.median(posterior, axis=0)
-                        mad_std_ls[
-                            i * batch_size : i * batch_size + batch_size, request_idx
-                        ] = mad_std(posterior, axis=0)
-            if num_batch_remainder > 0:
-                # do the remainder
-                for request_idx in range(request_tokens_num):
-                    posterior = self.predict_samples(
-                        inputs=inputs[num_batch * batch_size :],
-                        input_tokens=input_tokens[num_batch * batch_size :],
-                        request_tokens=request_tokens[:, request_idx],
-                        size=size,
-                    )
-                    median_ls[num_batch * batch_size :, request_idx] = np.median(
-                        posterior, axis=0
-                    )
-                    mad_std_ls[num_batch * batch_size :, request_idx] = mad_std(
-                        posterior, axis=0
-                    )
+                        median_ls[num_batch * batch_size :, request_idx] = np.median(
+                            posterior, axis=0
+                        )
+                        mad_std_ls[num_batch * batch_size :, request_idx] = mad_std(
+                            posterior, axis=0
+                        )
+                        pbar.update(num_batch_remainder)
 
         all_pred = np.column_stack((median_ls, mad_std_ls))
         # detokenize instead of getting from arguement to make sure the name is english

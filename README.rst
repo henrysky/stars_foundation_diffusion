@@ -40,11 +40,6 @@ Python dependencies are listed in `requirements.txt`_.
 
     ⚠️ You have to set ``magicnumber = nan`` in ``astroNN`` `configuration file`_ for the data reduction code to work properly.
 
-..
-
-    ⚠️ Using ``mps`` backend of ``PyTorch`` on Apple device is known to yield incorrect results. Please use ``cuda`` or ``cpu`` as backend.
-
-
 .. _configuration file: https://astronn.readthedocs.io/en/latest/quick_start.html#configuration-file
 
 Datasets

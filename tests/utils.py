@@ -22,7 +22,7 @@ def KLdivergence(x, y):
 
     References
     ----------
-    Pérez-Cruz, F. Kullback-Leibler divergence estimation of continuous distributions 
+    Pérez-Cruz, F. Kullback-Leibler divergence estimation of continuous distributions
     IEEE International Symposium on Information Theory, 2008.
     """
     # Check the dimensions are consistent

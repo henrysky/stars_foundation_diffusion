@@ -18,6 +18,7 @@ class ConditionalLinear(nn.Module):
         cond_dim: int = 0,
         device: Union[str, torch.device] = "cpu",
         dtype: torch.dtype = torch.float32,
+        built: bool = True,  # do not use this arguement, it is for internal use only
     ):
         """
         Conditional linear layer used in diffusion model
@@ -26,7 +27,7 @@ class ConditionalLinear(nn.Module):
             dim_in (int): input dimension
             dim_out (int): output dimension, also the time embedding dimension
             t (int): total number of time step tokens
-            cond_dim (int, optional): condition dimension, by default 0 (no condition)
+            cond_dim (int, optional): condition dimension, by default 0 which means no condition
             device (Union[str, torch.device], optional): device to run the model, by default "cpu"
             dtype (torch.dtype, optional): data type of the model, by default torch.float32
         """
@@ -37,21 +38,24 @@ class ConditionalLinear(nn.Module):
         self.cond_dim = cond_dim
         self.device = device
         self.dtype = dtype
-        if self.cond_dim < 0:
-            raise ValueError("cond_dim must be non-negative")
-        else:
-            if self.cond_dim != self.dim_out and self.cond_dim != 0:
+        self._built = built
+        if self.cond_dim != self.dim_out and self.cond_dim != 0:
+            if not self._built:
                 # since the condition is added to the time embedding, it must have the same dimension as the output so we are mapping it to the same dimension
                 warnings.warn(
                     f"In ideal case, cond_dim equals to dim_out. Now cond_dim ({self.cond_dim}) is linearly mapped to dim_out ({self.dim_out}) so you have additional trainable parameters."
                 )
-                self.cond_lin = nn.Linear(
-                    self.cond_dim,
-                    self.dim_out,
-                    **self.factory_kwargs,
-                )
-            else:
-                self.cond_lin = torch.nn.Identity()
+            self.cond_lin = nn.Linear(
+                self.cond_dim,
+                self.dim_out,
+                **self.factory_kwargs,
+            )
+            # forward function depends on whether a condition is provided or not
+            self.forward = self._forward_cond
+        else:
+            self.cond_lin = torch.nn.Identity()
+            self.forward = self._forward_simple
+
         self.lin = nn.Linear(
             self.dim_in,
             self.dim_out,
@@ -60,12 +64,7 @@ class ConditionalLinear(nn.Module):
         # time embedding
         self.embed = nn.Embedding(self.t, self.dim_out, **self.factory_kwargs)
         self.embed.weight.data.uniform_()  # uniform initialization of the time embedding
-
-        # forward function depends on whether a condition is provided
-        if self.cond_dim > 0:
-            self.forward = self._forward_cond
-        else:
-            self.forward = self._forward_simple
+            
 
         # if no condition is provided, use this zero tensor to NOT modify the time embedding
         self.a_zero = torch.zeros(1, **self.factory_kwargs)
@@ -123,6 +122,7 @@ class ConditionalDiffusionModel(nn.Module):
         beta_start: float = 1.0e-5,
         beta_end: float = 1.0e-1,
         schedule: str = "sigmoid",
+        built: bool = False,  # do not use this arguement, it is for internal use only
     ):
         """
         Conditional denoising diffusion probabilistic model, Ho et al 2020 (https://arxiv.org/abs/2006.11239)
@@ -151,22 +151,26 @@ class ConditionalDiffusionModel(nn.Module):
         self.activation = self.get_activation(activation)
         self.device = device
         self.dtype = dtype
+        self.built = built
+
         self.lin_layers = nn.ModuleList(
             [
                 ConditionalLinear(
-                    self.dim,
-                    self.dense_num,
-                    self.num_steps,
-                    self.cond_dim,
+                    dim_in=self.dim,
+                    dim_out=self.dense_num,
+                    t=self.num_steps,
+                    cond_dim=self.cond_dim,
+                    built=self.built,
                     **self.factory_kwargs,
                 )
             ]
             + [
                 ConditionalLinear(
-                    self.dense_num,
-                    self.dense_num,
-                    self.num_steps,
-                    self.cond_dim,
+                    dim_in=self.dense_num,
+                    dim_out=self.dense_num,
+                    t=self.num_steps,
+                    cond_dim=self.cond_dim,
+                    built=self.built,
                     **self.factory_kwargs,
                 )
                 for _ in range(self.n_layers - 1)
@@ -230,7 +234,7 @@ class ConditionalDiffusionModel(nn.Module):
         return params
 
     def get_activation(
-        self, activation: Union[str, Callable]
+        self, activation: Optional[Union[str, Callable]]
     ) -> Callable[[torch.Tensor], torch.Tensor]:
         if activation is None:
             activation = "relu"
@@ -342,7 +346,9 @@ class ConditionalDiffusionModel(nn.Module):
         output = self(x, t, cond_x)
         output = torch.where(torch.isnan(output), e, output)
         loss = torch.nn.functional.mse_loss(output, e)
-        return loss * (batch_size / torch.count_nonzero(~torch.isnan(torch.sum(x_0, dim=1))))
+        return loss * (
+            batch_size / torch.count_nonzero(~torch.isnan(torch.sum(x_0, dim=1)))
+        )
 
     def make_beta_schedule(self, schedule: str = "linear") -> torch.Tensor:
         if schedule == "linear":

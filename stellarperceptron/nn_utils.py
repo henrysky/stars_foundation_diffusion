@@ -46,7 +46,7 @@ def shuffle_row(arrays_ls: List[NDArray], first_n: Optional[List[int]] = None) -
         )
     if not all([a.shape == array_shape for a in arrays_ls]):
         raise ValueError("All arrays should have the same shape")
-    
+
     master_idx = np.tile(np.arange(array_shape[1]), (array_shape[0], 1))
 
     if first_n is None:  # if yes then use a faster implementation
@@ -54,7 +54,10 @@ def shuffle_row(arrays_ls: List[NDArray], first_n: Optional[List[int]] = None) -
         [rng.shuffle(master_idx[i, :]) for i in np.arange(array_shape[0])]
         return [np.take_along_axis(a, master_idx, axis=1) for a in arrays_ls]
     else:
-        [rng.shuffle(master_idx[i, :n]) for i, n in zip(np.arange(array_shape[0]), first_n)]
+        [
+            rng.shuffle(master_idx[i, :n])
+            for i, n in zip(np.arange(array_shape[0]), first_n)
+        ]
         return [np.take_along_axis(a, master_idx, axis=1) for a in arrays_ls]
 
 
@@ -224,5 +227,5 @@ class TrainingGenerator(torch.utils.data.IterableDataset):
             dtype=self.factory_kwargs["dtype"],
         ).to(self.factory_kwargs["device"], non_blocking=True)[self.idx_list]
         self.batches_lengthes = rng.integers(
-            low=self.length_range[0], high=self.length_range[1]+1, size=len(self)
+            low=self.length_range[0], high=self.length_range[1] + 1, size=len(self)
         )
