@@ -1034,7 +1034,9 @@ class StellarPerceptron:
                             enabled=self.mixed_precision,
                         ):
                             posterior = self.predict_samples(
-                                inputs=inputs[i * batch_size : i * batch_size + batch_size],
+                                inputs=inputs[
+                                    i * batch_size : i * batch_size + batch_size
+                                ],
                                 input_tokens=input_tokens[
                                     i * batch_size : i * batch_size + batch_size
                                 ],
@@ -1042,10 +1044,12 @@ class StellarPerceptron:
                                 size=size,
                             )
                             median_ls[
-                                i * batch_size : i * batch_size + batch_size, request_idx
+                                i * batch_size : i * batch_size + batch_size,
+                                request_idx,
                             ] = np.median(posterior, axis=0)
                             mad_std_ls[
-                                i * batch_size : i * batch_size + batch_size, request_idx
+                                i * batch_size : i * batch_size + batch_size,
+                                request_idx,
                             ] = mad_std(posterior, axis=0)
                             pbar.update(batch_size)
                 if num_batch_remainder > 0:

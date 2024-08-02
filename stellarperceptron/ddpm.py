@@ -1,6 +1,6 @@
 """Denosing diffusion probabilistic model"""
 
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 import warnings
 
 import numpy as np
@@ -64,7 +64,6 @@ class ConditionalLinear(nn.Module):
         # time embedding
         self.embed = nn.Embedding(self.t, self.dim_out, **self.factory_kwargs)
         self.embed.weight.data.uniform_()  # uniform initialization of the time embedding
-            
 
         # if no condition is provided, use this zero tensor to NOT modify the time embedding
         self.a_zero = torch.zeros(1, **self.factory_kwargs)
