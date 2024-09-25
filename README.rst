@@ -83,7 +83,7 @@ Now you can run all notebooks or training script inside the container
 Jupyter Notebooks
 --------------------------------------------------------
 
--   | `Dataset_Reduction.ipynb`_
+-   | `Dataset_Reduction.ipynb`_  (External Repository)
     | The notebook contains code to generate the dataset used by this paper. 
     | Terabytes of (mostly gaia) data need to be downloaded in the process to construct the datasets.
 -   | `DDPM.ipynb`_
@@ -95,7 +95,7 @@ Jupyter Notebooks
 -   | `California_Housing.ipynb`_
     | The notebook contains code to train a model on California housing dataset for demonstration purpose.
 
-.. _Dataset_Reduction.ipynb: Dataset_Reduction.ipynb
+.. _Dataset_Reduction.ipynb: https://github.com/henrysky/astroNN_stars_foundation/blob/main/Dataset_Reduction.ipynb
 .. _Inference.ipynb: Inference.ipynb
 .. _DDPM.ipynb: DDPM.ipynb
 .. _DDPM_Conditional.ipynb: DDPM_Conditional.ipynb
