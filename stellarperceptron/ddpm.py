@@ -83,11 +83,12 @@ class ConditionalLinear(nn.Module):
         out = gamma.view(-1, self.dim_out) + x
         return out
 
-    def _forward_simple(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+    def _forward_simple(self, x: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Args:
             x (torch.Tensor): input tensor
             t (torch.Tensor): time token
+            cond (torch.Tensor): condition tensor
         """
         out = self.lin(x)
         out = self.time_forward(out, t, self.a_zero)
